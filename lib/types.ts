@@ -37,6 +37,9 @@ export type AdAccountSummary = {
   // (e.g. campaigns optimizing for reach only) — conversions/revenue/roas/cpa
   // are not meaningful in that case and the UI should say so instead of 0.
   conversionTrackingAvailable: boolean;
+  // Set only when source is "mock" as a fallback from a live provider —
+  // explains why (missing token, API error, etc.) instead of failing silently.
+  fallbackReason?: string;
   series: MetricSeries[];
 };
 

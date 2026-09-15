@@ -151,6 +151,7 @@ export default function Dashboard() {
               <div className="flex items-center gap-2 mb-2">
                 <h3 className="text-sm font-medium capitalize">{ad.platform} Ads</h3>
                 <span
+                  title={ad.fallbackReason}
                   className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ${
                     ad.source === "live"
                       ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
@@ -160,6 +161,9 @@ export default function Dashboard() {
                   {ad.source === "live" ? "Live data" : "Mock data"}
                 </span>
               </div>
+              {ad.fallbackReason && (
+                <div className="text-xs text-amber-600 dark:text-amber-400 mb-2">{ad.fallbackReason}</div>
+              )}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {visibleMetrics.has("spend") && (
                   <StatCard label="Spend" value={ad.spend} unit="currency" change={platformCompare?.spend} />

@@ -23,7 +23,11 @@ function num(v: string | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-async function fetchInsights(accountId: string, token: string, range: DateRange): Promise<GraphInsightRow | null> {
+async function fetchInsights(
+  accountId: string,
+  token: string,
+  range: DateRange
+): Promise<{ row: GraphInsightRow | null; error?: string }> {
   const fields = ["spend", "impressions", "clicks", "ctr", "cpc", "reach", "omni_purchase", "omni_purchase_values"];
   const timeRange = JSON.stringify({ since: range.start, until: range.end });
   const url = new URL(`https://graph.facebook.com/${GRAPH_VERSION}/act_${accountId}/insights`);
@@ -31,13 +35,24 @@ async function fetchInsights(accountId: string, token: string, range: DateRange)
   url.searchParams.set("time_range", timeRange);
   url.searchParams.set("access_token", token);
 
-  const res = await fetch(url.toString(), { next: { revalidate: 0 } });
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), { next: { revalidate: 0 } });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.error("Meta Graph API network error", message);
+    return { row: null, error: `network error: ${message}` };
+  }
+
   if (!res.ok) {
-    console.error("Meta Graph API error", res.status, await res.text());
-    return null;
+    const body = await res.text();
+    console.error("Meta Graph API error", res.status, body);
+    return { row: null, error: `HTTP ${res.status}: ${body.slice(0, 300)}` };
   }
   const json = await res.json();
-  return json.data?.[0] ?? null;
+  const row = json.data?.[0] ?? null;
+  if (!row) return { row: null, error: "Graph API returned no data rows for this account/range" };
+  return { row };
 }
 
 /**
@@ -55,12 +70,14 @@ export class MetaAdsProvider {
     const accountId = process.env.META_AD_ACCOUNT_ID || DEFAULT_AD_ACCOUNT_ID;
 
     if (!token) {
-      return this.mockFallback.getSummary("meta", range);
+      const fallback = await this.mockFallback.getSummary("meta", range);
+      return { ...fallback, fallbackReason: "META_ACCESS_TOKEN is not set in this environment" };
     }
 
-    const row = await fetchInsights(accountId, token, range);
+    const { row, error } = await fetchInsights(accountId, token, range);
     if (!row) {
-      return this.mockFallback.getSummary("meta", range);
+      const fallback = await this.mockFallback.getSummary("meta", range);
+      return { ...fallback, fallbackReason: error ?? "unknown error calling Meta Graph API" };
     }
 
     const spend = num(row.spend);
