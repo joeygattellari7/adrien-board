@@ -9,6 +9,14 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Password protection
+
+The whole app is gated behind a single shared password (no per-user accounts yet)
+via `middleware.ts`. Set `DASHBOARD_PASSWORD` in your environment (and in Vercel for
+production) — without it, the app is left open so a fresh unconfigured environment
+never accidentally locks out its own developer. The password is checked against a
+hash stored in an httpOnly cookie, not sent back and forth on every request.
+
 ## Data providers
 
 Each data source lives behind a small provider interface in `lib/providers/`, so live
