@@ -11,21 +11,34 @@ export default function StatCard({
   value,
   unit,
   change,
+  unavailable,
+  unavailableReason,
 }: {
   label: string;
   value: number;
   unit: Unit;
   change?: number;
+  unavailable?: boolean;
+  unavailableReason?: string;
 }) {
   const positive = (change ?? 0) >= 0;
   return (
     <div className="rounded-xl border border-black/10 dark:border-white/10 p-4 bg-white/60 dark:bg-white/5">
       <div className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">{label}</div>
-      <div className="text-2xl font-semibold mt-1">{format(value, unit)}</div>
-      {typeof change === "number" && (
-        <div className={`text-xs mt-1 ${positive ? "text-emerald-600" : "text-red-500"}`}>
-          {positive ? "▲" : "▼"} {Math.abs(change).toFixed(1)}% vs prior period
-        </div>
+      {unavailable ? (
+        <>
+          <div className="text-2xl font-semibold mt-1 text-black/30 dark:text-white/30">—</div>
+          <div className="text-xs mt-1 text-black/40 dark:text-white/40">{unavailableReason ?? "Not tracked"}</div>
+        </>
+      ) : (
+        <>
+          <div className="text-2xl font-semibold mt-1">{format(value, unit)}</div>
+          {typeof change === "number" && (
+            <div className={`text-xs mt-1 ${positive ? "text-emerald-600" : "text-red-500"}`}>
+              {positive ? "▲" : "▼"} {Math.abs(change).toFixed(1)}% vs prior period
+            </div>
+          )}
+        </>
       )}
     </div>
   );

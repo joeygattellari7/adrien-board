@@ -11,7 +11,17 @@ export function generateAdInsights(summaries: AdAccountSummary[]): Insight[] {
 
   for (const s of summaries) {
     const platformName = s.platform === "meta" ? "Meta" : "Google";
-    if (s.roas >= 3) {
+
+    if (!s.conversionTrackingAvailable) {
+      insights.push({
+        id: nextId(),
+        category: "performance",
+        sentiment: "neutral",
+        title: `${platformName} has no conversion tracking set up`,
+        detail: `Campaigns are optimizing for reach/traffic, so revenue, ROAS, conversions, and CPA can't be measured yet.`,
+        recommendation: `Add the ${platformName === "Meta" ? "Meta Pixel or Conversions API" : "Google Ads conversion tag"} to your ordering site and switch campaigns to a purchase objective to unlock ROAS tracking.`,
+      });
+    } else if (s.roas >= 3) {
       insights.push({
         id: nextId(),
         category: "performance",

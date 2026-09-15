@@ -12,6 +12,7 @@ const AD_METRIC_OPTIONS = [
   { key: "spend", label: "Spend" },
   { key: "impressions", label: "Impressions" },
   { key: "clicks", label: "Clicks" },
+  { key: "reach", label: "Reach" },
   { key: "conversions", label: "Conversions" },
   { key: "revenue", label: "Revenue" },
   { key: "roas", label: "ROAS" },
@@ -158,9 +159,21 @@ export default function Dashboard() {
         {ads.loading && <div className="text-sm text-black/50">Loading…</div>}
         {ads.data?.ads.map((ad) => {
           const platformCompare = ads.data?.compare?.byPlatform[ad.platform];
+          const untracked = !ad.conversionTrackingAvailable;
           return (
             <div key={ad.platform} className="mb-6">
-              <h3 className="text-sm font-medium mb-2 capitalize">{ad.platform} Ads</h3>
+              <div className="flex items-center gap-2 mb-2">
+                <h3 className="text-sm font-medium capitalize">{ad.platform} Ads</h3>
+                <span
+                  className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ${
+                    ad.source === "live"
+                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                      : "bg-black/10 dark:bg-white/10 text-black/50 dark:text-white/50"
+                  }`}
+                >
+                  {ad.source === "live" ? "Live data" : "Mock data"}
+                </span>
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {visibleMetrics.has("spend") && (
                   <StatCard label="Spend" value={ad.spend} unit="currency" change={platformCompare?.spend} />
@@ -176,19 +189,35 @@ export default function Dashboard() {
                 {visibleMetrics.has("clicks") && (
                   <StatCard label="Clicks" value={ad.clicks} unit="number" change={platformCompare?.clicks} />
                 )}
+                {visibleMetrics.has("reach") && (
+                  <StatCard label="Reach" value={ad.reach} unit="number" change={platformCompare?.reach} />
+                )}
                 {visibleMetrics.has("conversions") && (
                   <StatCard
                     label="Conversions"
                     value={ad.conversions}
                     unit="number"
                     change={platformCompare?.conversions}
+                    unavailable={untracked}
                   />
                 )}
                 {visibleMetrics.has("revenue") && (
-                  <StatCard label="Revenue" value={ad.revenue} unit="currency" change={platformCompare?.revenue} />
+                  <StatCard
+                    label="Revenue"
+                    value={ad.revenue}
+                    unit="currency"
+                    change={platformCompare?.revenue}
+                    unavailable={untracked}
+                  />
                 )}
                 {visibleMetrics.has("roas") && (
-                  <StatCard label="ROAS" value={ad.roas} unit="number" change={platformCompare?.roas} />
+                  <StatCard
+                    label="ROAS"
+                    value={ad.roas}
+                    unit="number"
+                    change={platformCompare?.roas}
+                    unavailable={untracked}
+                  />
                 )}
                 {visibleMetrics.has("ctr") && (
                   <StatCard label="CTR" value={ad.ctr} unit="percent" change={platformCompare?.ctr} />
@@ -197,7 +226,13 @@ export default function Dashboard() {
                   <StatCard label="CPC" value={ad.cpc} unit="currency" change={platformCompare?.cpc} />
                 )}
                 {visibleMetrics.has("cpa") && (
-                  <StatCard label="CPA" value={ad.cpa} unit="currency" change={platformCompare?.cpa} />
+                  <StatCard
+                    label="CPA"
+                    value={ad.cpa}
+                    unit="currency"
+                    change={platformCompare?.cpa}
+                    unavailable={untracked}
+                  />
                 )}
               </div>
             </div>

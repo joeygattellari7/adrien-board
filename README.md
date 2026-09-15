@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+This is the Adrien dashboard for Juliano Pizzaria, a [Next.js](https://nextjs.org) app.
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Data providers
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Each data source lives behind a small provider interface in `lib/providers/`, so live
+integrations can be swapped in without touching the dashboard UI. Provider status:
 
-## Learn More
+| Source | Status | Env vars |
+| --- | --- | --- |
+| Meta (Facebook/Instagram) Ads | **Live** (falls back to mock if unconfigured) | `META_ACCESS_TOKEN`, `META_AD_ACCOUNT_ID` |
+| Google Ads | Mock | — |
+| Bite Business | Mock | — |
+| Social (Facebook/Instagram/TikTok/YouTube) | Mock | — |
 
-To learn more about Next.js, take a look at the following resources:
+### Meta Ads setup
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Create a Meta app with Marketing API access and generate a long-lived access token
+   with `ads_read` permission for the Juliano Pizzaria ad account.
+2. Set `META_ACCESS_TOKEN` in your environment (and in Vercel Project Settings →
+   Environment Variables for production).
+3. Optionally set `META_AD_ACCOUNT_ID` — defaults to Juliano Pizzaria's ad account
+   (`937731679434253`).
+4. Without a token, `/api/ads` transparently serves mock data for Meta so the app
+   never breaks in an unconfigured environment — each ad platform card shows a
+   "Live data" or "Mock data" badge so it's clear which is which.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**Note:** Juliano Pizzaria's Meta ad account currently has no purchase/conversion
+tracking configured (campaigns are optimizing for reach, not purchases), so revenue,
+ROAS, conversions, and CPA show as "Not tracked" until a pixel or Conversions API
+event is set up and campaigns switch to a purchase objective. Spend, impressions,
+clicks, reach, CTR, and CPC are live today.
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Import this repository in [Vercel](https://vercel.com/new), point it at the
+`claude/adrien-dashboard-juliano` branch, and add the environment variables above.

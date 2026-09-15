@@ -22,15 +22,21 @@ export type AdPlatform = "google" | "meta";
 
 export type AdAccountSummary = {
   platform: AdPlatform;
+  source: "live" | "mock";
   spend: number;
   impressions: number;
   clicks: number;
+  reach: number;
   conversions: number;
   revenue: number;
   roas: number;
   ctr: number;
   cpc: number;
   cpa: number;
+  // False when the ad account has no purchase/conversion tracking set up
+  // (e.g. campaigns optimizing for reach only) — conversions/revenue/roas/cpa
+  // are not meaningful in that case and the UI should say so instead of 0.
+  conversionTrackingAvailable: boolean;
   series: MetricSeries[];
 };
 

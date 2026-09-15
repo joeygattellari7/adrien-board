@@ -57,27 +57,32 @@ export class MockAdsProvider implements AdsProvider {
     const spendSeries = buildSeries("spend", "Spend", "currency", range, platform === "meta" ? 180 : 140, 0.4, platform);
     const impressionsSeries = buildSeries("impressions", "Impressions", "number", range, 12000, 0.5, platform);
     const clicksSeries = buildSeries("clicks", "Clicks", "number", range, 220, 0.5, platform);
+    const reachSeries = buildSeries("reach", "Reach", "number", range, 8000, 0.4, platform);
     const conversionsSeries = buildSeries("conversions", "Conversions", "number", range, 18, 0.6, platform);
     const revenueSeries = buildSeries("revenue", "Revenue", "currency", range, platform === "meta" ? 520 : 410, 0.45, platform);
 
     const spend = spendSeries.total;
     const impressions = Math.round(impressionsSeries.total);
     const clicks = Math.round(clicksSeries.total);
+    const reach = Math.round(reachSeries.total);
     const conversions = Math.round(conversionsSeries.total);
     const revenue = revenueSeries.total;
 
     return {
       platform,
+      source: "mock",
       spend,
       impressions,
       clicks,
+      reach,
       conversions,
       revenue,
       roas: spend > 0 ? Math.round((revenue / spend) * 100) / 100 : 0,
       ctr: impressions > 0 ? Math.round((clicks / impressions) * 10000) / 100 : 0,
       cpc: clicks > 0 ? Math.round((spend / clicks) * 100) / 100 : 0,
       cpa: conversions > 0 ? Math.round((spend / conversions) * 100) / 100 : 0,
-      series: [spendSeries, impressionsSeries, clicksSeries, conversionsSeries, revenueSeries],
+      conversionTrackingAvailable: true,
+      series: [spendSeries, impressionsSeries, clicksSeries, reachSeries, conversionsSeries, revenueSeries],
     };
   }
 }

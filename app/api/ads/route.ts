@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CompareOption, compareRangeFor, pctChange, rangeFromDates } from "@/lib/dateRange";
-import { adsProvider } from "@/lib/providers/mock";
+import { getAdsSummary } from "@/lib/providers";
 import { generateAdInsights } from "@/lib/insights";
 import { AdAccountSummary, AdPlatform } from "@/lib/types";
 
 const AD_PLATFORMS: AdPlatform[] = ["google", "meta"];
-const METRICS = ["spend", "impressions", "clicks", "conversions", "revenue", "roas", "ctr", "cpc", "cpa"] as const;
+const METRICS = ["spend", "impressions", "clicks", "reach", "conversions", "revenue", "roas", "ctr", "cpc", "cpa"] as const;
 
 function metricChanges(current: AdAccountSummary, previous: AdAccountSummary) {
   const out: Record<string, number> = {};
@@ -22,9 +22,9 @@ export async function GET(req: NextRequest) {
   const compareOption = (req.nextUrl.searchParams.get("compare") as CompareOption | null) ?? "none";
   const compareRange = compareRangeFor(range, compareOption);
 
-  const ads = await Promise.all(AD_PLATFORMS.map((p) => adsProvider.getSummary(p, range)));
+  const ads = await Promise.all(AD_PLATFORMS.map((p) => getAdsSummary(p, range)));
   const previous = compareRange
-    ? await Promise.all(AD_PLATFORMS.map((p) => adsProvider.getSummary(p, compareRange)))
+    ? await Promise.all(AD_PLATFORMS.map((p) => getAdsSummary(p, compareRange)))
     : null;
   const insights = generateAdInsights(ads);
 
