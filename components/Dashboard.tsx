@@ -5,6 +5,7 @@ import StatCard from "./StatCard";
 import InsightsPanel from "./InsightsPanel";
 import DateRangePicker from "./DateRangePicker";
 import CompareToSelect from "./CompareToSelect";
+import MetricSelect from "./MetricSelect";
 import { CompareOption, presetRange } from "@/lib/dateRange";
 import { AdAccountSummary, BusinessSummary, DateRange, Insight, SocialAccountSummary } from "@/lib/types";
 
@@ -14,7 +15,6 @@ const AD_METRIC_OPTIONS = [
   { key: "clicks", label: "Clicks" },
   { key: "reach", label: "Reach" },
   { key: "conversions", label: "Conversions" },
-  { key: "revenue", label: "Revenue" },
   { key: "roas", label: "ROAS" },
   { key: "ctr", label: "CTR" },
   { key: "cpc", label: "CPC" },
@@ -54,7 +54,7 @@ export default function Dashboard() {
   const [socialCompare, setSocialCompare] = useState<CompareOption>("none");
 
   const [visibleMetrics, setVisibleMetrics] = useState<Set<string>>(
-    new Set(["spend", "revenue", "roas", "conversions"])
+    new Set(["spend", "roas", "conversions"])
   );
 
   const business = useSectionData<{ business: BusinessSummary; compare: BusinessCompare | null }>(
@@ -137,24 +137,10 @@ export default function Dashboard() {
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
           <h2 className="text-lg font-semibold">Ad Performance (Google + Meta)</h2>
           <div className="flex flex-wrap items-center gap-2">
+            <MetricSelect options={AD_METRIC_OPTIONS} selected={visibleMetrics} onToggle={toggleMetric} />
             <CompareToSelect value={adsCompare} onChange={setAdsCompare} />
             <DateRangePicker value={adsRange} onChange={setAdsRange} />
           </div>
-        </div>
-        <div className="flex flex-wrap gap-2 mb-4">
-          {AD_METRIC_OPTIONS.map((m) => (
-            <button
-              key={m.key}
-              onClick={() => toggleMetric(m.key)}
-              className={`text-xs px-2.5 py-1 rounded-full border transition ${
-                visibleMetrics.has(m.key)
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "border-black/15 dark:border-white/15 text-black/60 dark:text-white/60"
-              }`}
-            >
-              {m.label}
-            </button>
-          ))}
         </div>
         {ads.loading && <div className="text-sm text-black/50">Loading…</div>}
         {ads.data?.ads.map((ad) => {
@@ -198,15 +184,6 @@ export default function Dashboard() {
                     value={ad.conversions}
                     unit="number"
                     change={platformCompare?.conversions}
-                    unavailable={untracked}
-                  />
-                )}
-                {visibleMetrics.has("revenue") && (
-                  <StatCard
-                    label="Revenue"
-                    value={ad.revenue}
-                    unit="currency"
-                    change={platformCompare?.revenue}
                     unavailable={untracked}
                   />
                 )}
