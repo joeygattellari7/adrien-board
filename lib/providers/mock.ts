@@ -19,6 +19,13 @@ function seededRandom(seed: string) {
   };
 }
 
+// A deterministic pseudo-random value for a single day, independent of any
+// other day, so different date ranges (and comparisons between them) pull
+// real, varying numbers instead of replaying the same sequence.
+function dayValue(seed: string, date: string) {
+  return seededRandom(`${seed}:${date}`)();
+}
+
 function buildSeries(
   key: string,
   label: string,
@@ -28,15 +35,20 @@ function buildSeries(
   volatility: number,
   seed: string
 ): MetricSeries {
-  const rand = seededRandom(seed + key);
   const dates = dateList(range);
   let total = 0;
   const points = dates.map((date) => {
-    const value = Math.max(0, base * (1 + (rand() - 0.5) * volatility));
+    // Slow upward drift over calendar time plus day-to-day noise, so
+    // different periods (this month vs last quarter, etc.) differ.
+    const dayIndex = Math.floor(new Date(date).getTime() / 86400000);
+    const drift = 1 + (Math.sin(dayIndex / 45) + dayIndex / 4000) * 0.15;
+    const noise = 1 + (dayValue(seed + key, date) - 0.5) * volatility;
+    const value = Math.max(0, base * drift * noise);
     total += value;
     return { date, value: Math.round(value * 100) / 100 };
   });
-  const change = Math.round((rand() - 0.4) * 40 * 10) / 10;
+  const midpoint = dates[Math.floor(dates.length / 2)] ?? range.start;
+  const change = Math.round((dayValue(seed + key + "change", midpoint) - 0.4) * 40 * 10) / 10;
   return { key, label, unit, points, total: Math.round(total * 100) / 100, change };
 }
 

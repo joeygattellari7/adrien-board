@@ -47,20 +47,20 @@ function MonthGrid({
   const rangeEnd = hoverEnd ?? selEnd;
 
   return (
-    <div>
+    <div className="w-[238px] shrink-0">
       <div className="text-center text-sm font-medium mb-2">
         {month.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
       </div>
-      <div className="grid grid-cols-7 text-xs text-black/40 dark:text-white/40 mb-1">
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-          <div key={d} className="text-center py-1">
+      <div className="grid grid-cols-7 gap-1 text-xs text-black/40 dark:text-white/40 mb-1">
+        {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d, i) => (
+          <div key={`${d}-${i}`} className="h-6 w-8 flex items-center justify-center">
             {d}
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-y-0.5">
+      <div className="grid grid-cols-7 gap-1">
         {cells.map((iso, i) => {
-          if (!iso) return <div key={i} />;
+          if (!iso) return <div key={i} className="h-8 w-8" />;
           const inRange = selStart && rangeEnd ? isBetween(iso, selStart, rangeEnd) : false;
           const isEdge = iso === selStart || iso === selEnd;
           return (
@@ -69,7 +69,7 @@ function MonthGrid({
               type="button"
               onMouseEnter={() => onHover(iso)}
               onClick={() => onPick(iso)}
-              className={`h-8 w-8 mx-auto text-sm rounded-md transition flex items-center justify-center ${
+              className={`h-8 w-8 text-sm rounded-md transition flex items-center justify-center ${
                 isEdge
                   ? "bg-blue-600 text-white"
                   : inRange

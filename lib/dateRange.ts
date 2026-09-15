@@ -69,6 +69,40 @@ export function dateList(range: DateRange): string[] {
   });
 }
 
+export type CompareOption = "none" | "previous_period" | "previous_quarter" | "previous_year";
+
+export const COMPARE_OPTIONS: { value: CompareOption; label: string }[] = [
+  { value: "none", label: "None" },
+  { value: "previous_period", label: "Previous period" },
+  { value: "previous_quarter", label: "Previous quarter" },
+  { value: "previous_year", label: "Previous year" },
+];
+
+export function compareRangeFor(range: DateRange, option: CompareOption): DateRange | null {
+  if (option === "none") return null;
+
+  if (option === "previous_period") {
+    const n = daysBetween(range);
+    const end = new Date(range.start + "T00:00:00");
+    end.setDate(end.getDate() - 1);
+    const start = new Date(end);
+    start.setDate(end.getDate() - (n - 1));
+    return { start: toISO(start), end: toISO(end), label: "Previous period" };
+  }
+
+  const monthsBack = option === "previous_quarter" ? 3 : 12;
+  const start = new Date(range.start + "T00:00:00");
+  const end = new Date(range.end + "T00:00:00");
+  start.setMonth(start.getMonth() - monthsBack);
+  end.setMonth(end.getMonth() - monthsBack);
+  return { start: toISO(start), end: toISO(end), label: option === "previous_quarter" ? "Previous quarter" : "Previous year" };
+}
+
+export function pctChange(current: number, previous: number): number {
+  if (previous === 0) return current === 0 ? 0 : 100;
+  return Math.round(((current - previous) / previous) * 1000) / 10;
+}
+
 export function formatDateLabel(iso: string): string {
   const d = new Date(iso + "T00:00:00");
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
