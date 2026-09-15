@@ -37,9 +37,16 @@ async function fetchInsights(
 
   let res: Response;
   try {
-    res = await fetch(url.toString(), { next: { revalidate: 0 } });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    try {
+      res = await fetch(url.toString(), { next: { revalidate: 0 }, signal: controller.signal });
+    } finally {
+      clearTimeout(timeout);
+    }
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
+    const timedOut = e instanceof Error && e.name === "AbortError";
+    const message = timedOut ? "request timed out after 8s" : e instanceof Error ? e.message : String(e);
     console.error("Meta Graph API network error", message);
     return { row: null, error: `network error: ${message}` };
   }
