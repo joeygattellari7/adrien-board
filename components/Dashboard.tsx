@@ -84,11 +84,15 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <div className="mb-8 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-8 text-white">
-        <h1 className="text-4xl font-extrabold tracking-tight">ADRIEN</h1>
-        <p className="mt-2 text-sm text-white/80">Client Name: Juliano Pizzaria</p>
+      <div className="relative mb-8 rounded-2xl bg-zinc-200 dark:bg-zinc-800 px-6 py-8">
+        {/* TODO: swap for the actual G8 Media logo image once provided */}
+        <div className="absolute top-4 right-6 text-sm font-semibold text-black/40 dark:text-white/40">
+          G8 Media
+        </div>
+        <h1 className="text-center text-4xl font-extrabold tracking-tight text-black dark:text-white">ADRIEN</h1>
       </div>
       <header className="mb-8">
+        <p className="text-sm font-medium">Client: Juliano Pizzaria</p>
         <p className="text-sm text-black/50 dark:text-white/50">Real-time performance dashboard</p>
       </header>
 
