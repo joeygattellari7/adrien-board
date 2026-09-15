@@ -84,8 +84,11 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="mb-8 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-8 text-white">
+        <h1 className="text-4xl font-extrabold tracking-tight">ADRIEN</h1>
+        <p className="mt-2 text-sm text-white/80">Client Name: Juliano Pizzaria</p>
+      </div>
       <header className="mb-8">
-        <h1 className="text-2xl font-bold">Adrien — Juliano Pizzaria</h1>
         <p className="text-sm text-black/50 dark:text-white/50">Real-time performance dashboard</p>
       </header>
 
