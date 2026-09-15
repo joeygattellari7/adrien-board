@@ -27,13 +27,26 @@ const AD_METRIC_OPTIONS = [
   { key: "cpa", label: "CPA" },
 ] as const;
 
+const MAX_DAYS = 365;
+
 export default function Dashboard() {
   const [days, setDays] = useState(30);
+  const [customInput, setCustomInput] = useState("30");
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [visibleMetrics, setVisibleMetrics] = useState<Set<string>>(
     new Set(["spend", "revenue", "roas", "conversions"])
   );
+
+  function applyCustomDays(raw: string) {
+    const n = Math.round(Number(raw));
+    if (!Number.isFinite(n) || n < 1) return;
+    setDays(Math.min(n, MAX_DAYS));
+  }
+
+  useEffect(() => {
+    setCustomInput(String(days));
+  }, [days]);
 
   useEffect(() => {
     setLoading(true);
@@ -63,18 +76,39 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold">Adrien — Juliano Pizzaria</h1>
           <p className="text-sm text-black/50 dark:text-white/50">Real-time performance dashboard</p>
         </div>
-        <div className="flex gap-1 rounded-lg border border-black/10 dark:border-white/10 p-1">
-          {PRESETS.map((p) => (
-            <button
-              key={p}
-              onClick={() => setDays(p)}
-              className={`px-3 py-1.5 text-sm rounded-md transition ${
-                days === p ? "bg-black text-white dark:bg-white dark:text-black" : "hover:bg-black/5 dark:hover:bg-white/10"
-              }`}
-            >
-              {p}d
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex gap-1 rounded-lg border border-black/10 dark:border-white/10 p-1">
+            {PRESETS.map((p) => (
+              <button
+                key={p}
+                onClick={() => setDays(p)}
+                className={`px-3 py-1.5 text-sm rounded-md transition ${
+                  days === p ? "bg-black text-white dark:bg-white dark:text-black" : "hover:bg-black/5 dark:hover:bg-white/10"
+                }`}
+              >
+                {p}d
+              </button>
+            ))}
+          </div>
+          <form
+            className="flex items-center gap-1.5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              applyCustomDays(customInput);
+            }}
+          >
+            <span className="text-sm text-black/50 dark:text-white/50">Last</span>
+            <input
+              type="number"
+              min={1}
+              max={MAX_DAYS}
+              value={customInput}
+              onChange={(e) => setCustomInput(e.target.value)}
+              onBlur={() => applyCustomDays(customInput)}
+              className="w-16 rounded-md border border-black/10 dark:border-white/10 bg-transparent px-2 py-1.5 text-sm text-center"
+            />
+            <span className="text-sm text-black/50 dark:text-white/50">days</span>
+          </form>
         </div>
       </header>
 
