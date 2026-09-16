@@ -1,7 +1,7 @@
 import { DateRange, AdAccountSummary } from "../types";
 import { MockAdsProvider } from "./mock";
 
-const API_VERSION = "v18";
+const API_VERSION = "v23";
 
 type GoogleAdsRow = {
   metrics?: {
@@ -64,9 +64,12 @@ async function fetchMetrics(
   accessToken: string,
   range: DateRange
 ): Promise<{ row: GoogleAdsRow | null; error?: string }> {
+  // Query the campaign resource (not customer) and sum across whatever rows
+  // come back — this is the documented-safe GAQL pattern for account-level
+  // totals over a date range.
   const query = `
     SELECT metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions, metrics.conversions_value
-    FROM customer
+    FROM campaign
     WHERE segments.date BETWEEN '${range.start}' AND '${range.end}'
   `;
 
