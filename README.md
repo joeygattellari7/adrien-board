@@ -25,7 +25,7 @@ integrations can be swapped in without touching the dashboard UI. Provider statu
 | Source | Status | Env vars |
 | --- | --- | --- |
 | Meta (Facebook/Instagram) Ads | **Live** (falls back to mock if unconfigured) | `META_ACCESS_TOKEN`, `META_AD_ACCOUNT_ID` |
-| Google Ads | Code ready, needs credentials | `GOOGLE_ADS_DEVELOPER_TOKEN`, `GOOGLE_ADS_CLIENT_ID`, `GOOGLE_ADS_CLIENT_SECRET`, `GOOGLE_ADS_REFRESH_TOKEN`, `GOOGLE_ADS_CUSTOMER_ID`, `GOOGLE_ADS_LOGIN_CUSTOMER_ID` (optional) |
+| Google Ads | Code ready, needs credentials | `GOOGLE_ADS_CLIENT_ID`, `GOOGLE_ADS_CLIENT_SECRET`, `GOOGLE_ADS_REFRESH_TOKEN`, `GOOGLE_ADS_CUSTOMER_ID`, `GOOGLE_ADS_LOGIN_CUSTOMER_ID` (optional), `GOOGLE_ADS_DEVELOPER_TOKEN` (optional, ignored by Google as of Sept 2026) |
 | Bite Business | Mock | — |
 | Social (Facebook/Instagram/TikTok/YouTube) | Mock | — |
 
@@ -49,24 +49,30 @@ clicks, reach, CTR, and CPC are live today.
 
 ### Google Ads setup
 
-Google Ads requires more setup than Meta — a developer token plus a full OAuth
-client, not just a single long-lived token:
+**Google changed this on September 10, 2026**: developer tokens are sunset — access
+level is now tied to the Google Cloud project behind your OAuth client, not a
+separate token. `GOOGLE_ADS_DEVELOPER_TOKEN` is optional here (kept only in case
+Google reinstates the header check in a future API version).
 
-1. Apply for a **developer token** in the Google Ads API Center (under the manager
-   account that has access to Juliano Pizzaria's Google Ads account). Basic access
-   is enough for read-only reporting.
-2. Create an **OAuth 2.0 Client ID** (type: Desktop app or Web app) in
-   [Google Cloud Console](https://console.cloud.google.com/apis/credentials), and
-   enable the Google Ads API for that project.
-3. Generate a **refresh token** for that OAuth client authorized against the Google
-   account that has access to the Ads account (Google's
-   [OAuth2 quickstart](https://developers.google.com/google-ads/api/docs/get-started/oauth-cloud-project)
-   walks through this — it's a one-time browser consent flow).
-4. Find the **customer ID** (the 10-digit number in Google Ads, no dashes) for
-   Juliano Pizzaria's account. If it's managed under an agency/MCC account, also set
+1. Create a Google Cloud project and enable the **Google Ads API** on it
+   (APIs & Services → Library → search "Google Ads API" → Enable). This gives the
+   project **Test access** by default, which only works against test accounts.
+2. From that same project's **Google Ads API Overview page** in Cloud Console,
+   apply for **Basic access** (needed to query Juliano Pizzaria's real account) —
+   Google now gates this behind brand verification.
+3. Create an **OAuth 2.0 Client ID** (type: Web application) on that project, with
+   `https://developers.google.com/oauthplayground` as an authorized redirect URI.
+4. Generate a **refresh token** using
+   [Google's OAuth Playground](https://developers.google.com/oauthplayground):
+   gear icon → "Use your own OAuth credentials" → paste Client ID/Secret → authorize
+   the `https://www.googleapis.com/auth/adwords` scope → exchange the code.
+5. Find the **customer ID** (the number shown top-right in Google Ads, no dashes)
+   for Juliano Pizzaria's account. If it's managed under an agency/MCC account
+   (the developer token application itself is applied from the MCC), also set
    `GOOGLE_ADS_LOGIN_CUSTOMER_ID` to the MCC's customer ID.
-5. Set all five (six with login customer ID) as env vars in Vercel.
-6. Without them, `/api/ads` transparently serves mock data for Google, same as Meta
+6. Set `GOOGLE_ADS_CLIENT_ID`, `GOOGLE_ADS_CLIENT_SECRET`, `GOOGLE_ADS_REFRESH_TOKEN`,
+   `GOOGLE_ADS_CUSTOMER_ID` (and optionally `GOOGLE_ADS_LOGIN_CUSTOMER_ID`) in Vercel.
+7. Without them, `/api/ads` transparently serves mock data for Google, same as Meta
    — the card's badge and an inline message name exactly which env var is missing.
 
 ## Deploy on Vercel

@@ -60,7 +60,7 @@ async function getAccessToken(
 async function fetchMetrics(
   customerId: string,
   loginCustomerId: string | undefined,
-  developerToken: string,
+  developerToken: string | undefined,
   accessToken: string,
   range: DateRange
 ): Promise<{ row: GoogleAdsRow | null; error?: string }> {
@@ -70,11 +70,15 @@ async function fetchMetrics(
     WHERE segments.date BETWEEN '${range.start}' AND '${range.end}'
   `;
 
+  // As of the September 2026 Google Ads API change, access level is tied to
+  // the Cloud project behind the OAuth client, not a developer token — the
+  // header is optional and ignored by the API, kept here only for
+  // backward-compatible logging on Google's end if one is configured.
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`,
-    "developer-token": developerToken,
     "Content-Type": "application/json",
   };
+  if (developerToken) headers["developer-token"] = developerToken;
   if (loginCustomerId) headers["login-customer-id"] = loginCustomerId.replace(/-/g, "");
 
   try {
@@ -113,12 +117,17 @@ async function fetchMetrics(
 
 /**
  * Real Google Ads provider backed by the Google Ads API (GAQL search).
- * Requires GOOGLE_ADS_DEVELOPER_TOKEN, GOOGLE_ADS_CLIENT_ID,
- * GOOGLE_ADS_CLIENT_SECRET, GOOGLE_ADS_REFRESH_TOKEN, and
- * GOOGLE_ADS_CUSTOMER_ID (optionally GOOGLE_ADS_LOGIN_CUSTOMER_ID if the
- * account sits under a manager/MCC account) as env vars. Falls back to mock
- * data with a fallbackReason whenever anything is missing or fails, so the
- * dashboard never breaks in an unconfigured environment.
+ *
+ * As of the September 2026 Google Ads API change, access level is
+ * determined by the Cloud project behind the OAuth client, not by a
+ * developer token — so GOOGLE_ADS_DEVELOPER_TOKEN is optional here.
+ *
+ * Requires GOOGLE_ADS_CLIENT_ID, GOOGLE_ADS_CLIENT_SECRET,
+ * GOOGLE_ADS_REFRESH_TOKEN, and GOOGLE_ADS_CUSTOMER_ID (optionally
+ * GOOGLE_ADS_LOGIN_CUSTOMER_ID if the account sits under a manager/MCC
+ * account) as env vars. Falls back to mock data with a fallbackReason
+ * whenever anything is missing or fails, so the dashboard never breaks in
+ * an unconfigured environment.
  */
 export class GoogleAdsProvider {
   private mockFallback = new MockAdsProvider();
@@ -132,7 +141,6 @@ export class GoogleAdsProvider {
     const loginCustomerId = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID;
 
     const missing = [
-      !developerToken && "GOOGLE_ADS_DEVELOPER_TOKEN",
       !clientId && "GOOGLE_ADS_CLIENT_ID",
       !clientSecret && "GOOGLE_ADS_CLIENT_SECRET",
       !refreshToken && "GOOGLE_ADS_REFRESH_TOKEN",
@@ -150,7 +158,7 @@ export class GoogleAdsProvider {
       return { ...fallback, fallbackReason: tokenError ?? "failed to get Google OAuth access token" };
     }
 
-    const { row, error } = await fetchMetrics(customerId!, loginCustomerId, developerToken!, accessToken, range);
+    const { row, error } = await fetchMetrics(customerId!, loginCustomerId, developerToken, accessToken, range);
     if (!row) {
       const fallback = await this.mockFallback.getSummary("google", range);
       return { ...fallback, fallbackReason: error ?? "unknown error calling Google Ads API" };
