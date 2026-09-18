@@ -97,9 +97,13 @@ export default function Dashboard() {
       </header>
 
       {/* Business section */}
-      <section className="mb-10">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-          <h2 className="text-lg font-semibold">Business Data (Bite Business)</h2>
+      <section className="mb-10 rounded-2xl border-2 border-emerald-500/25 dark:border-emerald-400/25 bg-emerald-50/40 dark:bg-emerald-950/15 p-5 md:p-6 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+            <h2 className="text-xl font-bold tracking-tight">Business Data</h2>
+            <span className="text-sm font-normal text-black/40 dark:text-white/40">Bite Business</span>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <CompareToSelect value={businessCompare} onChange={setBusinessCompare} />
             <DateRangePicker value={businessRange} onChange={setBusinessRange} />
@@ -107,7 +111,7 @@ export default function Dashboard() {
         </div>
         {business.loading && <div className="text-sm text-black/50">Loading…</div>}
         {business.data && (
-          <>
+          <div className="rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900 p-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <StatCard
                 label="Total sales"
@@ -135,7 +139,7 @@ export default function Dashboard() {
               />
             </div>
             <InsightsPanel insights={business.insights} title="Business insights" />
-          </>
+          </div>
         )}
       </section>
 
