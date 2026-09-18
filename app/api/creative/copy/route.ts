@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
     product: body.product,
     offer: typeof body.offer === "string" ? body.offer : undefined,
     tone: typeof body.tone === "string" ? body.tone : undefined,
+    details: typeof body.details === "string" ? body.details : undefined,
     count: typeof body.count === "number" ? body.count : undefined,
   });
 

@@ -1,15 +1,27 @@
 const GRAPH_VERSION = "v21.0";
 
-export type MetaObjective = "OUTCOME_TRAFFIC" | "OUTCOME_ENGAGEMENT" | "OUTCOME_AWARENESS";
+export type MetaObjective = "OUTCOME_TRAFFIC" | "OUTCOME_ENGAGEMENT" | "OUTCOME_AWARENESS" | "OUTCOME_SALES";
 
 const OPTIMIZATION_GOAL: Record<MetaObjective, string> = {
   OUTCOME_TRAFFIC: "LINK_CLICKS",
   OUTCOME_ENGAGEMENT: "POST_ENGAGEMENT",
   OUTCOME_AWARENESS: "REACH",
+  OUTCOME_SALES: "OFFSITE_CONVERSIONS",
+};
+
+export type Gender = "all" | "male" | "female";
+
+export type Targeting = {
+  countries: string[]; // ISO country codes
+  ageMin: number;
+  ageMax: number;
+  gender: Gender;
+  interests?: string; // free-text, comma-separated interest names — resolved to IDs via Graph search
 };
 
 export type LaunchMetaCampaignInput = {
   campaignName: string;
+  adSetName: string;
   objective: MetaObjective;
   dailyBudget: number; // dollars
   headline: string;
@@ -17,8 +29,15 @@ export type LaunchMetaCampaignInput = {
   description: string;
   cta: string;
   linkUrl: string;
-  imageBase64?: string; // raw base64, no data: prefix
-  countries?: string[]; // ISO country codes, default ["AU"]
+  targeting: Targeting;
+  // Conversion objective only
+  pixelId?: string;
+  conversionEvent?: string;
+  // Up to two images: a 1:1 square and a 9:16 vertical. Both are optional;
+  // when both are given, Meta auto-selects the right one per placement via
+  // asset_feed_spec (documented mechanism for this exact use case).
+  squareImageBase64?: string;
+  verticalImageBase64?: string;
 };
 
 export type LaunchMetaCampaignResult = {
@@ -67,6 +86,63 @@ async function graphPost(path: string, token: string, body: Record<string, unkno
   return json;
 }
 
+async function graphGet(path: string, token: string, params: Record<string, string>): Promise<Record<string, unknown>> {
+  const url = new URL(`https://graph.facebook.com/${GRAPH_VERSION}${path}`);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  url.searchParams.set("access_token", token);
+  const res = await withTimeout((signal) => fetch(url.toString(), { signal }), 10000);
+  const json = await res.json();
+  if (!res.ok) {
+    const message = (json as { error?: { message?: string } }).error?.message ?? JSON.stringify(json);
+    throw new Error(`Meta Graph API error: ${message}`);
+  }
+  return json;
+}
+
+/**
+ * Resolves free-text interest names (comma-separated) to Meta interest
+ * targeting IDs via the ad interest search endpoint. Best-effort: unmatched
+ * names are silently skipped rather than failing the whole request, since
+ * interest targeting is additive, not required.
+ */
+async function resolveInterests(names: string, token: string): Promise<{ id: string; name: string }[]> {
+  const terms = names
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const resolved: { id: string; name: string }[] = [];
+  for (const term of terms) {
+    try {
+      const res = await graphGet("/search", token, { type: "adinterest", q: term, limit: "1" });
+      const data = res.data as { id: string; name: string }[] | undefined;
+      if (data && data[0]) resolved.push({ id: data[0].id, name: data[0].name });
+    } catch {
+      // Skip unresolved interests rather than failing the whole launch.
+    }
+  }
+  return resolved;
+}
+
+function buildTargetingSpec(t: Targeting, interests: { id: string; name: string }[]) {
+  const spec: Record<string, unknown> = {
+    geo_locations: { countries: t.countries },
+    age_min: t.ageMin,
+    age_max: t.ageMax,
+  };
+  if (t.gender === "male") spec.genders = [1];
+  if (t.gender === "female") spec.genders = [2];
+  if (interests.length > 0) {
+    spec.flexible_spec = [{ interests: interests.map((i) => ({ id: i.id, name: i.name })) }];
+  }
+  return spec;
+}
+
+async function uploadImage(act: string, token: string, base64: string): Promise<string | undefined> {
+  const imageRes = await graphPost(`/${act}/adimages`, token, { bytes: base64 });
+  const images = imageRes.images as Record<string, { hash: string }> | undefined;
+  return images ? Object.values(images)[0]?.hash : undefined;
+}
+
 /**
  * Builds a full Meta campaign → ad set → creative → ad, all created with
  * status PAUSED. Nothing spends and nothing goes live until a separate,
@@ -86,6 +162,10 @@ export async function launchMetaCampaign(input: LaunchMetaCampaignInput): Promis
   );
   if (missing.length > 0) throw new Error(`Missing env vars: ${missing.join(", ")}`);
 
+  if (input.objective === "OUTCOME_SALES" && (!input.pixelId || !input.conversionEvent)) {
+    throw new Error("pixelId and conversionEvent are required for the Sales/Conversion objective");
+  }
+
   const act = `act_${accountId}`;
 
   const campaign = await graphPost(`/${act}/campaigns`, token!, {
@@ -96,43 +176,61 @@ export async function launchMetaCampaign(input: LaunchMetaCampaignInput): Promis
   });
   const campaignId = campaign.id as string;
 
-  let imageHash: string | undefined;
-  if (input.imageBase64) {
-    const imageRes = await graphPost(`/${act}/adimages`, token!, { bytes: input.imageBase64 });
-    const images = imageRes.images as Record<string, { hash: string }> | undefined;
-    imageHash = images ? Object.values(images)[0]?.hash : undefined;
-  }
+  const interests = input.targeting.interests ? await resolveInterests(input.targeting.interests, token!) : [];
 
-  const adSet = await graphPost(`/${act}/adsets`, token!, {
-    name: `${input.campaignName} - Ad Set`,
+  const adSetBody: Record<string, unknown> = {
+    name: input.adSetName,
     campaign_id: campaignId,
     daily_budget: Math.round(input.dailyBudget * 100),
     billing_event: "IMPRESSIONS",
     optimization_goal: OPTIMIZATION_GOAL[input.objective],
     bid_strategy: "LOWEST_COST_WITHOUT_CAP",
-    targeting: {
-      geo_locations: { countries: input.countries ?? ["AU"] },
-    },
+    targeting: buildTargetingSpec(input.targeting, interests),
     status: "PAUSED",
-  });
+  };
+  if (input.objective === "OUTCOME_SALES") {
+    adSetBody.promoted_object = { pixel_id: input.pixelId, custom_event_type: input.conversionEvent };
+  }
+
+  const adSet = await graphPost(`/${act}/adsets`, token!, adSetBody);
   const adSetId = adSet.id as string;
 
-  const linkData: Record<string, unknown> = {
-    link: input.linkUrl,
-    message: input.primaryText,
-    name: input.headline,
-    description: input.description,
-    call_to_action: { type: CTA_MAP[input.cta] ?? "LEARN_MORE" },
-  };
-  if (imageHash) linkData.image_hash = imageHash;
+  const squareHash = input.squareImageBase64 ? await uploadImage(act, token!, input.squareImageBase64) : undefined;
+  const verticalHash = input.verticalImageBase64 ? await uploadImage(act, token!, input.verticalImageBase64) : undefined;
+  const ctaType = CTA_MAP[input.cta] ?? "LEARN_MORE";
 
-  const creative = await graphPost(`/${act}/adcreatives`, token!, {
-    name: `${input.campaignName} - Creative`,
-    object_story_spec: {
-      page_id: pageId,
-      link_data: linkData,
-    },
-  });
+  let creativeBody: Record<string, unknown>;
+  if (squareHash && verticalHash) {
+    // Both formats supplied — let Meta pick the right one per placement.
+    creativeBody = {
+      name: `${input.campaignName} - Creative`,
+      object_story_spec: { page_id: pageId },
+      asset_feed_spec: {
+        images: [{ hash: squareHash }, { hash: verticalHash }],
+        bodies: [{ text: input.primaryText }],
+        titles: [{ text: input.headline }],
+        descriptions: [{ text: input.description }],
+        link_urls: [{ website_url: input.linkUrl }],
+        call_to_action_types: [ctaType],
+        ad_formats: ["AUTOMATIC_FORMAT"],
+      },
+    };
+  } else {
+    const linkData: Record<string, unknown> = {
+      link: input.linkUrl,
+      message: input.primaryText,
+      name: input.headline,
+      description: input.description,
+      call_to_action: { type: ctaType },
+    };
+    if (squareHash ?? verticalHash) linkData.image_hash = squareHash ?? verticalHash;
+    creativeBody = {
+      name: `${input.campaignName} - Creative`,
+      object_story_spec: { page_id: pageId, link_data: linkData },
+    };
+  }
+
+  const creative = await graphPost(`/${act}/adcreatives`, token!, creativeBody);
   const creativeId = creative.id as string;
 
   const ad = await graphPost(`/${act}/ads`, token!, {

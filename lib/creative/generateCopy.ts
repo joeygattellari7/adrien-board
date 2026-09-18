@@ -9,6 +9,7 @@ export type CopyRequest = {
   product: string; // e.g. "Margherita Pizza"
   offer?: string; // e.g. "20% off this weekend"
   tone?: string; // e.g. "fun and casual"
+  details?: string; // free-form extra context/brief, e.g. brand guidelines, must-include phrases
   count?: number;
 };
 
@@ -47,7 +48,11 @@ function templateVariations(req: CopyRequest): CopyVariation[] {
       cta: "Shop Now",
     },
   ];
-  return templates.slice(0, count).map((t, i) => ({ ...t, cta: t.cta || CTA_OPTIONS[i % CTA_OPTIONS.length] }));
+  return templates.slice(0, count).map((t, i) => ({
+    ...t,
+    cta: t.cta || CTA_OPTIONS[i % CTA_OPTIONS.length],
+    primaryText: req.details ? `${t.primaryText} ${req.details}`.trim() : t.primaryText,
+  }));
 }
 
 async function anthropicVariations(req: CopyRequest, apiKey: string): Promise<CopyVariation[] | null> {
@@ -56,6 +61,7 @@ async function anthropicVariations(req: CopyRequest, apiKey: string): Promise<Co
 Product/focus: ${req.product}
 ${req.offer ? `Offer: ${req.offer}` : ""}
 ${req.tone ? `Tone: ${req.tone}` : "Tone: warm, appetizing, locally-owned feel"}
+${req.details ? `Additional details/brief from the marketer — follow these closely:\n${req.details}` : ""}
 
 Respond ONLY with a JSON array of ${count} objects, each with keys: headline (max 40 chars), primaryText (max 125 chars), description (max 30 chars), cta (one of: Order Now, Learn More, Shop Now, Get Offer, Sign Up). No markdown, no explanation, just the JSON array.`;
 

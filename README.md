@@ -99,12 +99,28 @@ Business Data stays on mock data until one of those is resolved.
 A separate tab (`/creative-factory`) with two pieces:
 
 1. **Ad copy generator** (`/api/creative/copy`) — writes headline/primary text/
-   description/CTA variations for a product/offer. Uses the Anthropic API for
-   genuinely varied copy when `ANTHROPIC_API_KEY` is set; otherwise falls back to
-   fixed templates so it always returns something usable.
+   description/CTA variations for a product/offer, plus a free-form "extra
+   details" brief (must-include phrases, brand guidelines, etc.) that's folded
+   into the prompt. Uses the Anthropic API for genuinely varied copy when
+   `ANTHROPIC_API_KEY` is set; otherwise falls back to fixed templates so it
+   always returns something usable.
 2. **Meta campaign builder & launcher** (`/api/creative/launch`,
    `/api/creative/activate`) — builds a full campaign → ad set → ad creative → ad
-   directly via the Graph API.
+   directly via the Graph API, with:
+   - Full audience targeting: countries, age range, gender, and free-text
+     interests (resolved to Meta's interest-targeting IDs via the ad interest
+     search endpoint — best match per name, unmatched names are skipped rather
+     than failing the request).
+   - A Conversions objective with pixel ID + conversion event fields (Juliano's
+     Meta account has no pixel configured yet, so this objective will fail
+     until one is set up — the UI flags this).
+   - Up to two images — a 1:1 square and a 9:16 vertical — with live aspect-ratio
+     previews in the form. When both are provided, the creative uses
+     `asset_feed_spec` so Meta auto-selects the right image per placement
+     (feed vs. Stories/Reels) instead of stretching one image everywhere.
+   - A review/preview step (mock ad card + a plain-English summary of the
+     campaign/ad set/audience) that has to be explicitly confirmed before
+     anything is sent to Meta at all.
 
 **Safety design — always creates paused, never auto-activates:** every campaign,
 ad set, and ad is created with `status: PAUSED`. Nothing spends money on creation.
