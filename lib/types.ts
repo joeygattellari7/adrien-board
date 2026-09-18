@@ -73,4 +73,7 @@ export type Insight = {
   title: string;
   detail: string;
   recommendation?: string;
+  // Set on "performance"/"social" insights so the UI can split them per
+  // platform instead of showing one combined list.
+  platform?: AdPlatform | SocialPlatform;
 };

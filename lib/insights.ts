@@ -16,6 +16,7 @@ export function generateAdInsights(summaries: AdAccountSummary[]): Insight[] {
       insights.push({
         id: nextId(),
         category: "performance",
+        platform: s.platform,
         sentiment: "neutral",
         title: `${platformName} has no conversion tracking set up`,
         detail: `Campaigns are optimizing for reach/traffic, so revenue, ROAS, conversions, and CPA can't be measured yet.`,
@@ -25,6 +26,7 @@ export function generateAdInsights(summaries: AdAccountSummary[]): Insight[] {
       insights.push({
         id: nextId(),
         category: "performance",
+        platform: s.platform,
         sentiment: "positive",
         title: `${platformName} ROAS is strong at ${s.roas}x`,
         detail: `Spend of $${s.spend.toFixed(0)} generated $${s.revenue.toFixed(0)} in tracked revenue.`,
@@ -34,6 +36,7 @@ export function generateAdInsights(summaries: AdAccountSummary[]): Insight[] {
       insights.push({
         id: nextId(),
         category: "performance",
+        platform: s.platform,
         sentiment: "negative",
         title: `${platformName} ROAS is weak at ${s.roas}x`,
         detail: `Spend of $${s.spend.toFixed(0)} is not converting efficiently (CPA $${s.cpa.toFixed(2)}).`,
@@ -45,6 +48,7 @@ export function generateAdInsights(summaries: AdAccountSummary[]): Insight[] {
       insights.push({
         id: nextId(),
         category: "performance",
+        platform: s.platform,
         sentiment: "negative",
         title: `${platformName} CTR is below 1% (${s.ctr}%)`,
         detail: `Low click-through suggests creative fatigue or weak hooks.`,

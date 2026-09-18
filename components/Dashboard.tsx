@@ -139,10 +139,14 @@ export default function Dashboard() {
         )}
       </section>
 
-      {/* Performance section */}
-      <section className="mb-10">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-          <h2 className="text-lg font-semibold">Ad Performance (Google + Meta)</h2>
+      {/* Performance section — visually distinct container since this is the
+          highest-traffic section of the dashboard */}
+      <section className="mb-10 rounded-2xl border-2 border-indigo-500/25 dark:border-indigo-400/25 bg-indigo-50/40 dark:bg-indigo-950/15 p-5 md:p-6 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-indigo-500" />
+            <h2 className="text-xl font-bold tracking-tight">Ad Performance</h2>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <MetricSelect options={AD_METRIC_OPTIONS} selected={visibleMetrics} onToggle={toggleMetric} />
             <CompareToSelect value={adsCompare} onChange={setAdsCompare} />
@@ -150,83 +154,90 @@ export default function Dashboard() {
           </div>
         </div>
         {ads.loading && <div className="text-sm text-black/50">Loading…</div>}
-        {ads.data?.ads.map((ad) => {
-          const platformCompare = ads.data?.compare?.byPlatform[ad.platform];
-          const untracked = !ad.conversionTrackingAvailable;
-          return (
-            <div key={ad.platform} className="mb-6">
-              <div className="flex items-center gap-2 mb-2">
-                <h3 className="text-sm font-medium capitalize">{ad.platform} Ads</h3>
-                <span
-                  title={ad.fallbackReason}
-                  className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ${
-                    ad.source === "live"
-                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
-                      : "bg-black/10 dark:bg-white/10 text-black/50 dark:text-white/50"
-                  }`}
-                >
-                  {ad.source === "live" ? "Live data" : "Mock data"}
-                </span>
+        <div className="flex flex-col gap-5">
+          {ads.data?.ads.map((ad) => {
+            const platformCompare = ads.data?.compare?.byPlatform[ad.platform];
+            const untracked = !ad.conversionTrackingAvailable;
+            const platformInsights = ads.insights.filter((i) => i.platform === ad.platform);
+            const accent = ad.platform === "meta" ? "border-blue-500/40" : "border-amber-500/40";
+            return (
+              <div
+                key={ad.platform}
+                className={`rounded-xl border-l-4 ${accent} border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900 p-4`}
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <h3 className="text-base font-semibold capitalize">{ad.platform} Ads</h3>
+                  <span
+                    title={ad.fallbackReason}
+                    className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ${
+                      ad.source === "live"
+                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                        : "bg-black/10 dark:bg-white/10 text-black/50 dark:text-white/50"
+                    }`}
+                  >
+                    {ad.source === "live" ? "Live data" : "Mock data"}
+                  </span>
+                </div>
+                {ad.fallbackReason && (
+                  <div className="text-xs text-amber-600 dark:text-amber-400 mb-3">{ad.fallbackReason}</div>
+                )}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {visibleMetrics.has("spend") && (
+                    <StatCard label="Spend" value={ad.spend} unit="currency" change={platformCompare?.spend} />
+                  )}
+                  {visibleMetrics.has("impressions") && (
+                    <StatCard
+                      label="Impressions"
+                      value={ad.impressions}
+                      unit="number"
+                      change={platformCompare?.impressions}
+                    />
+                  )}
+                  {visibleMetrics.has("clicks") && (
+                    <StatCard label="Clicks" value={ad.clicks} unit="number" change={platformCompare?.clicks} />
+                  )}
+                  {visibleMetrics.has("reach") && (
+                    <StatCard label="Reach" value={ad.reach} unit="number" change={platformCompare?.reach} />
+                  )}
+                  {visibleMetrics.has("conversions") && (
+                    <StatCard
+                      label="Conversions"
+                      value={ad.conversions}
+                      unit="number"
+                      change={platformCompare?.conversions}
+                      unavailable={untracked}
+                    />
+                  )}
+                  {visibleMetrics.has("roas") && (
+                    <StatCard
+                      label="ROAS"
+                      value={ad.roas}
+                      unit="number"
+                      change={platformCompare?.roas}
+                      unavailable={untracked}
+                    />
+                  )}
+                  {visibleMetrics.has("ctr") && (
+                    <StatCard label="CTR" value={ad.ctr} unit="percent" change={platformCompare?.ctr} />
+                  )}
+                  {visibleMetrics.has("cpc") && (
+                    <StatCard label="CPC" value={ad.cpc} unit="currency" change={platformCompare?.cpc} />
+                  )}
+                  {visibleMetrics.has("cpa") && (
+                    <StatCard
+                      label="CPA"
+                      value={ad.cpa}
+                      unit="currency"
+                      change={platformCompare?.cpa}
+                      unavailable={untracked}
+                    />
+                  )}
+                </div>
+                <InsightsPanel insights={platformInsights} title={`${ad.platform === "meta" ? "Meta" : "Google"} insights & ideas`} />
               </div>
-              {ad.fallbackReason && (
-                <div className="text-xs text-amber-600 dark:text-amber-400 mb-2">{ad.fallbackReason}</div>
-              )}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {visibleMetrics.has("spend") && (
-                  <StatCard label="Spend" value={ad.spend} unit="currency" change={platformCompare?.spend} />
-                )}
-                {visibleMetrics.has("impressions") && (
-                  <StatCard
-                    label="Impressions"
-                    value={ad.impressions}
-                    unit="number"
-                    change={platformCompare?.impressions}
-                  />
-                )}
-                {visibleMetrics.has("clicks") && (
-                  <StatCard label="Clicks" value={ad.clicks} unit="number" change={platformCompare?.clicks} />
-                )}
-                {visibleMetrics.has("reach") && (
-                  <StatCard label="Reach" value={ad.reach} unit="number" change={platformCompare?.reach} />
-                )}
-                {visibleMetrics.has("conversions") && (
-                  <StatCard
-                    label="Conversions"
-                    value={ad.conversions}
-                    unit="number"
-                    change={platformCompare?.conversions}
-                    unavailable={untracked}
-                  />
-                )}
-                {visibleMetrics.has("roas") && (
-                  <StatCard
-                    label="ROAS"
-                    value={ad.roas}
-                    unit="number"
-                    change={platformCompare?.roas}
-                    unavailable={untracked}
-                  />
-                )}
-                {visibleMetrics.has("ctr") && (
-                  <StatCard label="CTR" value={ad.ctr} unit="percent" change={platformCompare?.ctr} />
-                )}
-                {visibleMetrics.has("cpc") && (
-                  <StatCard label="CPC" value={ad.cpc} unit="currency" change={platformCompare?.cpc} />
-                )}
-                {visibleMetrics.has("cpa") && (
-                  <StatCard
-                    label="CPA"
-                    value={ad.cpa}
-                    unit="currency"
-                    change={platformCompare?.cpa}
-                    unavailable={untracked}
-                  />
-                )}
-              </div>
-            </div>
-          );
-        })}
-        <InsightsPanel insights={ads.insights} title="Performance insights & ideas" />
+            );
+          })}
+        </div>
       </section>
 
       {/* Social section */}
