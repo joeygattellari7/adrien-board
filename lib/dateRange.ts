@@ -2,8 +2,14 @@ import { DateRange } from "./types";
 
 export const PRESETS = [7, 14, 30, 60, 90] as const;
 
+// Formats a Date's LOCAL calendar date as YYYY-MM-DD. Deliberately not
+// toISOString(), which converts to UTC first — for any timezone ahead of
+// UTC (e.g. Australia, UTC+10) that silently shifts the date back a day.
 function toISO(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export function presetRange(days: number): DateRange {
