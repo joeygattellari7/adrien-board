@@ -94,6 +94,33 @@ regardless of which docs are correct, until either:
 
 Business Data stays on mock data until one of those is resolved.
 
+## Creative Factory
+
+A separate tab (`/creative-factory`) with two pieces:
+
+1. **Ad copy generator** (`/api/creative/copy`) — writes headline/primary text/
+   description/CTA variations for a product/offer. Uses the Anthropic API for
+   genuinely varied copy when `ANTHROPIC_API_KEY` is set; otherwise falls back to
+   fixed templates so it always returns something usable.
+2. **Meta campaign builder & launcher** (`/api/creative/launch`,
+   `/api/creative/activate`) — builds a full campaign → ad set → ad creative → ad
+   directly via the Graph API.
+
+**Safety design — always creates paused, never auto-activates:** every campaign,
+ad set, and ad is created with `status: PAUSED`. Nothing spends money on creation.
+The UI shows the draft with a link to review it in Meta Ads Manager, and a
+separate, explicit "Activate" button that's the *only* thing that flips it live —
+that action is never taken automatically.
+
+**Setup**: needs a `META_ACCESS_TOKEN` with **`ads_management`** permission (the
+reporting integration only needed `ads_read` — this is a different, broader scope,
+so the existing token will need to be regenerated), plus `META_PAGE_ID` — the
+Facebook Page ID that ads run from (find it under the Page's About section, or via
+Business Settings → Accounts → Pages).
+
+Google Ads campaign creation isn't built yet — it requires substantially more
+required fields per API call than Meta's flow. Flagged as a fast-follow, not started.
+
 ## Deploy on Vercel
 
 Import this repository in [Vercel](https://vercel.com/new), point it at the
