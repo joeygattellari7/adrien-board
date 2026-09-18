@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { compareRangeFor, pctChange, rangeFromDates } from "@/lib/dateRange";
-import { getBusinessSummary } from "@/lib/providers";
+import { businessProvider } from "@/lib/providers";
 import { generateBusinessInsights } from "@/lib/insights";
 import { CompareOption } from "@/lib/dateRange";
 
@@ -14,8 +14,8 @@ export async function GET(req: NextRequest) {
   const compareRange = compareRangeFor(range, compareOption);
 
   const [business, previous] = await Promise.all([
-    getBusinessSummary(range),
-    compareRange ? getBusinessSummary(compareRange) : Promise.resolve(null),
+    businessProvider.getSummary(range),
+    compareRange ? businessProvider.getSummary(compareRange) : Promise.resolve(null),
   ]);
   const insights = generateBusinessInsights(business);
 

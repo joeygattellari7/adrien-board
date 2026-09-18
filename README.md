@@ -26,7 +26,7 @@ integrations can be swapped in without touching the dashboard UI. Provider statu
 | --- | --- | --- |
 | Meta (Facebook/Instagram) Ads | **Live** (falls back to mock if unconfigured) | `META_ACCESS_TOKEN`, `META_AD_ACCOUNT_ID` |
 | Google Ads | Code ready, needs credentials | `GOOGLE_ADS_CLIENT_ID`, `GOOGLE_ADS_CLIENT_SECRET`, `GOOGLE_ADS_REFRESH_TOKEN`, `GOOGLE_ADS_CUSTOMER_ID`, `GOOGLE_ADS_LOGIN_CUSTOMER_ID` (optional), `GOOGLE_ADS_DEVELOPER_TOKEN` (optional, ignored by Google as of Sept 2026) |
-| Bite Business | Code ready, needs credentials | `BITE_API_BASE_URL`, `BITE_API_TOKEN`, `BITE_LOCATION_ID` |
+| Bite Business | Blocked — see below | — |
 | Social (Facebook/Instagram/TikTok/YouTube) | Mock | — |
 
 ### Meta Ads setup
@@ -75,27 +75,24 @@ Google reinstates the header check in a future API version).
 7. Without them, `/api/ads` transparently serves mock data for Google, same as Meta
    — the card's badge and an inline message name exactly which env var is missing.
 
-### Bite Business setup
+### Bite Business setup — currently blocked
 
-Bite's public API docs (`documentation.getbite.com`) are for the customer-facing
-ordering API — the endpoint we use, `GET /v2/reporting/orders/day/{date}`, needs a
-**Reporting-scoped API token** that isn't self-serve like Meta/Google's OAuth flows.
+`documentation.getbite.com` documents a *different* product (a kiosk/online-ordering
+platform) from the one Juliano Pizzaria actually uses (`bitebusiness.com`, a
+delivery-management platform — own drivers or Uber Direct). That doc's API isn't
+applicable here.
 
-1. Contact Bite's support or your account rep to request an API token with the
-   **"Reporting"** scope for Juliano Pizzaria's location, and ask for the
-   **production API base URL** (not published in the public docs).
-2. Find the **location ID** for Juliano Pizzaria (Bite support can confirm this, or
-   it may be visible in the Bite Admin portal).
-3. Set `BITE_API_BASE_URL`, `BITE_API_TOKEN`, and `BITE_LOCATION_ID` in Vercel.
-4. Without them, `/api/business` transparently serves mock data, same pattern as
-   Meta/Google — the badge and an inline message name exactly which env var is
-   missing.
+More importantly: Bite Business's own pricing page shows **API access is only
+included on "The Lot" plan** ($99/week); Juliano's account is on **"Main"**
+($59/week), which doesn't include API access at all. So this integration is blocked
+regardless of which docs are correct, until either:
 
-**Note on accuracy:** the Reporting API returns one day of orders at a time, with
-no all-time customer history. "New members" and "returning member rate" are
-approximated from repeat orders *within the selected date range* only, not lifetime
-— a guest who ordered once last month and once this month reads as two different
-"new" guests. Total sales, orders, average order value, and top items are exact.
+1. The account is upgraded to "The Lot," and Bite Business support is asked for
+   API docs/credentials for that plan tier, or
+2. Bite Business offers another way to get sales/order data out (a CSV export,
+   webhook, or similar) that doesn't require the API-access plan feature.
+
+Business Data stays on mock data until one of those is resolved.
 
 ## Deploy on Vercel
 
