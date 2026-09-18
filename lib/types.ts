@@ -56,6 +56,7 @@ export type SocialAccountSummary = {
 };
 
 export type BusinessSummary = {
+  source: "live" | "mock";
   totalSales: number;
   totalOrders: number;
   avgOrderValue: number;
@@ -64,6 +65,7 @@ export type BusinessSummary = {
   orderFrequencyDays: number;
   topItems: { name: string; orders: number; revenue: number }[];
   series: MetricSeries[];
+  fallbackReason?: string;
 };
 
 export type Insight = {

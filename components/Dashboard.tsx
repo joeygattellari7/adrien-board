@@ -112,6 +112,23 @@ export default function Dashboard() {
         {business.loading && <div className="text-sm text-black/50">Loading…</div>}
         {business.data && (
           <div className="rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span
+                title={business.data.business.fallbackReason}
+                className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ${
+                  business.data.business.source === "live"
+                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                    : "bg-black/10 dark:bg-white/10 text-black/50 dark:text-white/50"
+                }`}
+              >
+                {business.data.business.source === "live" ? "Live data" : "Mock data"}
+              </span>
+            </div>
+            {business.data.business.fallbackReason && (
+              <div className="text-xs text-amber-600 dark:text-amber-400 mb-3">
+                {business.data.business.fallbackReason}
+              </div>
+            )}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <StatCard
                 label="Total sales"

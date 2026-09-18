@@ -123,6 +123,7 @@ export class MockBusinessProvider implements BusinessProvider {
     const totalOrders = Math.round(ordersSeries.total);
 
     return {
+      source: "mock",
       totalSales,
       totalOrders,
       avgOrderValue: totalOrders > 0 ? Math.round((totalSales / totalOrders) * 100) / 100 : 0,
