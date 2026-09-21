@@ -236,6 +236,145 @@ function AssetUploader({
   );
 }
 
+function domainFromUrl(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url || "yourwebsite.com";
+  }
+}
+
+/** Mimics a Facebook/Instagram feed post — same layout Meta's own ad preview uses. */
+function MetaAdPreview({ ad, linkUrl }: { ad: LocalAd; linkUrl: string }) {
+  const images = ad.assets.filter((a) => a.type === "image");
+  const video = ad.assets.find((a) => a.type === "video");
+  const isCarousel = ad.format === "carousel" && images.length >= 2;
+  const primary = images[0] ?? video;
+
+  return (
+    <div className="rounded-lg border border-black/15 dark:border-white/15 bg-white dark:bg-zinc-900 overflow-hidden max-w-sm">
+      <div className="flex items-center gap-2 p-2.5">
+        <div className="w-8 h-8 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">J</div>
+        <div className="min-w-0">
+          <div className="text-xs font-semibold truncate">Juliano Pizzaria</div>
+          <div className="text-[10px] text-black/40 dark:text-white/40">Sponsored · 🌐</div>
+        </div>
+      </div>
+      {ad.primaryText && <div className="px-2.5 pb-2 text-xs whitespace-pre-wrap">{ad.primaryText}</div>}
+
+      {isCarousel ? (
+        <div className="flex gap-0.5 overflow-x-auto">
+          {images.map((img) => (
+            <div key={img.id} className="w-32 flex-shrink-0">
+              <div className={img.format === "9:16" ? "aspect-[9/16]" : "aspect-square"}>
+                <img src={URL.createObjectURL(img.file)} alt="" className="w-full h-full object-cover" />
+              </div>
+              <div className="bg-black/5 dark:bg-white/5 p-1.5">
+                <div className="text-[10px] font-semibold truncate">{img.cardHeadline || ad.headline || "Headline"}</div>
+                <div className="text-[9px] text-black/50 dark:text-white/50 truncate">{img.cardDescription || ad.description}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : primary ? (
+        <div className={primary.format === "9:16" ? "aspect-[9/16] max-h-80" : "aspect-square"}>
+          {primary.type === "image" ? (
+            <img src={URL.createObjectURL(primary.file)} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-black/80 flex items-center justify-center text-white text-3xl">▶</div>
+          )}
+        </div>
+      ) : (
+        <div className="aspect-square bg-black/5 dark:bg-white/5 flex items-center justify-center text-xs text-black/30 dark:text-white/30">No media</div>
+      )}
+
+      {!isCarousel && (
+        <div className="flex items-center justify-between gap-2 p-2.5 bg-black/[0.03] dark:bg-white/[0.03]">
+          <div className="min-w-0">
+            <div className="text-[10px] uppercase text-black/40 dark:text-white/40 truncate">{domainFromUrl(linkUrl)}</div>
+            <div className="text-xs font-semibold truncate">{ad.headline || "Headline"}</div>
+            {ad.description && <div className="text-[10px] text-black/50 dark:text-white/50 truncate">{ad.description}</div>}
+          </div>
+          <button type="button" disabled className="text-[10px] font-semibold px-2.5 py-1.5 rounded-md bg-black/10 dark:bg-white/10 flex-shrink-0">
+            {ad.cta}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Mimics a Google Search results ad — headline/URL/description plus sitelinks, same layout as the real SERP. */
+function GoogleSearchAdPreview({
+  headline1,
+  headline2,
+  description,
+  finalUrl,
+  sitelinks,
+}: {
+  headline1: string;
+  headline2: string;
+  description: string;
+  finalUrl: string;
+  sitelinks: LocalSitelink[];
+}) {
+  return (
+    <div className="rounded-lg border border-black/15 dark:border-white/15 bg-white dark:bg-zinc-900 p-3 max-w-md font-sans">
+      <div className="flex items-center gap-1.5 mb-0.5">
+        <span className="text-[10px] font-bold border border-black/30 dark:border-white/40 rounded px-1 text-black/70 dark:text-white/70">Ad</span>
+        <span className="text-xs text-black/60 dark:text-white/60">{domainFromUrl(finalUrl)}</span>
+      </div>
+      <div className="text-blue-700 dark:text-blue-400 text-base leading-tight truncate">
+        {[headline1, headline2].filter(Boolean).join(" | ") || "Your headline here"}
+      </div>
+      <div className="text-xs text-black/60 dark:text-white/60 mt-0.5">{description || "Your description here."}</div>
+      {sitelinks.filter((s) => s.text).length > 0 && (
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 pt-2 border-t border-black/10 dark:border-white/10">
+          {sitelinks
+            .filter((s) => s.text)
+            .slice(0, 4)
+            .map((s) => (
+              <div key={s.id}>
+                <div className="text-blue-700 dark:text-blue-400 text-xs font-medium">{s.text}</div>
+                {s.description1 && <div className="text-[10px] text-black/50 dark:text-white/50">{s.description1}</div>}
+              </div>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Mimics a Google Display/Performance Max responsive ad card. */
+function GoogleDisplayAdPreview({
+  headline,
+  description,
+  image,
+  businessName,
+}: {
+  headline: string;
+  description: string;
+  image?: LocalGoogleImage;
+  businessName: string;
+}) {
+  return (
+    <div className="rounded-lg border border-black/15 dark:border-white/15 bg-white dark:bg-zinc-900 overflow-hidden max-w-sm">
+      <div className="aspect-video bg-black/5 dark:bg-white/5">
+        {image ? (
+          <img src={URL.createObjectURL(image.file)} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-xs text-black/30 dark:text-white/30">No image</div>
+        )}
+      </div>
+      <div className="p-2.5">
+        <div className="text-[10px] text-black/40 dark:text-white/40">{businessName}</div>
+        <div className="text-sm font-semibold truncate">{headline || "Headline"}</div>
+        <div className="text-xs text-black/50 dark:text-white/50 truncate">{description || "Description"}</div>
+      </div>
+    </div>
+  );
+}
+
 type LaunchResult = {
   campaignId: string;
   adSets: { adSetId: string; adSetName: string; ads: { adId: string; adName: string }[] }[];
@@ -250,6 +389,7 @@ type LocalGoogleAdGroup = {
   id: string;
   name: string;
   keywordsText: string; // one per line — "word" = broad, "word" in quotes = phrase, [word] = exact
+  negativeKeywordsText: string; // one per line, plain text — always excluded exact-match
   headlines: string[];
   descriptions: string[];
   images: LocalGoogleImage[];
@@ -262,6 +402,7 @@ function newGoogleAdGroup(index: number): LocalGoogleAdGroup {
     id: newId(),
     name: `Ad Group ${index}`,
     keywordsText: "",
+    negativeKeywordsText: "",
     headlines: ["", "", ""],
     descriptions: ["", ""],
     images: [],
@@ -634,6 +775,7 @@ export default function CreativeFactory() {
         gAdGroups.map(async (ag) => ({
           name: ag.name,
           keywords: parseKeywordLines(ag.keywordsText),
+          negativeKeywords: ag.negativeKeywordsText.split("\n").map((l) => l.trim()).filter(Boolean),
           headlines: ag.headlines.filter(Boolean),
           descriptions: ag.descriptions.filter(Boolean),
           images: await Promise.all(ag.images.map(async (img) => ({ base64: await fileToBase64(img.file) }))),
@@ -1055,23 +1197,9 @@ export default function CreativeFactory() {
                     {as.startTime ? `, starts ${new Date(as.startTime).toLocaleString()}` : ""}
                     {as.endTime ? `, ends ${new Date(as.endTime).toLocaleString()}` : ""}
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div className="flex flex-wrap gap-3">
                     {as.ads.map((ad) => (
-                      <div key={ad.id} className="rounded-lg border border-black/10 dark:border-white/10 p-2.5">
-                        <div className="flex gap-2 mb-1">
-                          {ad.assets.slice(0, 3).map((a) => (
-                            <div key={a.id} className="w-10 h-10 rounded overflow-hidden bg-black/5 dark:bg-white/5 flex-shrink-0">
-                              {a.type === "image" ? (
-                                <img src={URL.createObjectURL(a.file)} alt="" className="w-full h-full object-cover" />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-[10px]">🎬</div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                        <div className="font-medium text-xs">{ad.headline || "(no headline)"}</div>
-                        <div className="text-xs text-black/60 dark:text-white/60">{ad.primaryText || "(no text)"}</div>
-                      </div>
+                      <MetaAdPreview key={ad.id} ad={ad} linkUrl={linkUrl} />
                     ))}
                   </div>
                 </div>
@@ -1209,17 +1337,29 @@ export default function CreativeFactory() {
                     </div>
 
                     {gCampaignType === "SEARCH" && (
-                      <div className="mb-3">
-                        <label className="text-xs font-medium text-black/50 dark:text-white/50">
-                          Keywords — one per line. Plain = broad, &quot;in quotes&quot; = phrase, [in brackets] = exact
-                        </label>
-                        <textarea
-                          value={ag.keywordsText}
-                          onChange={(e) => updateGoogleAdGroup(ag.id, { keywordsText: e.target.value })}
-                          rows={4}
-                          placeholder={'pizza delivery\n"margherita pizza"\n[juliano pizzaria]'}
-                          className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm font-mono"
-                        />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                        <div>
+                          <label className="text-xs font-medium text-black/50 dark:text-white/50">
+                            Keywords — one per line. Plain = broad, &quot;in quotes&quot; = phrase, [in brackets] = exact
+                          </label>
+                          <textarea
+                            value={ag.keywordsText}
+                            onChange={(e) => updateGoogleAdGroup(ag.id, { keywordsText: e.target.value })}
+                            rows={4}
+                            placeholder={'pizza delivery\n"margherita pizza"\n[juliano pizzaria]'}
+                            className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-black/50 dark:text-white/50">Negative keywords — one per line</label>
+                          <textarea
+                            value={ag.negativeKeywordsText}
+                            onChange={(e) => updateGoogleAdGroup(ag.id, { negativeKeywordsText: e.target.value })}
+                            rows={4}
+                            placeholder={"free\njobs\nrecipe"}
+                            className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm font-mono"
+                          />
+                        </div>
                       </div>
                     )}
 
@@ -1380,21 +1520,30 @@ export default function CreativeFactory() {
                       {parseKeywordLines(ag.keywordsText).length} keyword{parseKeywordLines(ag.keywordsText).length !== 1 ? "s" : ""}
                     </div>
                   )}
-                  {gCampaignType === "VIDEO" ? (
-                    <div className="text-xs text-black/50 dark:text-white/50 mb-2">
+                  {gCampaignType === "SEARCH" && (
+                    <GoogleSearchAdPreview
+                      headline1={ag.headlines.filter(Boolean)[0] || ""}
+                      headline2={ag.headlines.filter(Boolean)[1] || ""}
+                      description={ag.descriptions.filter(Boolean)[0] || ""}
+                      finalUrl={gFinalUrl}
+                      sitelinks={gSitelinks}
+                    />
+                  )}
+                  {gCampaignType === "VIDEO" && (
+                    <div className="text-xs text-black/50 dark:text-white/50">
                       🎬 {ag.videoId || "(no video)"} — CTA: {ag.callToAction}
-                    </div>
-                  ) : (
-                    <div className="flex gap-2 mb-2">
-                      {ag.images.slice(0, 3).map((img) => (
-                        <div key={img.id} className="w-10 h-10 rounded overflow-hidden bg-black/5 dark:bg-white/5 flex-shrink-0">
-                          <img src={URL.createObjectURL(img.file)} alt="" className="w-full h-full object-cover" />
-                        </div>
-                      ))}
+                      <div className="font-medium text-sm text-black dark:text-white mt-1">{ag.headlines.filter(Boolean)[0] || "(no headline)"}</div>
+                      <div>{ag.descriptions.filter(Boolean)[0] || "(no description)"}</div>
                     </div>
                   )}
-                  <div className="font-medium text-sm">{ag.headlines.filter(Boolean)[0] || "(no headline)"}</div>
-                  <div className="text-xs text-black/60 dark:text-white/60">{ag.descriptions.filter(Boolean)[0] || "(no description)"}</div>
+                  {(gCampaignType === "DISPLAY" || gCampaignType === "PERFORMANCE_MAX") && (
+                    <GoogleDisplayAdPreview
+                      headline={ag.headlines.filter(Boolean)[0] || ""}
+                      description={ag.descriptions.filter(Boolean)[0] || ""}
+                      image={ag.images[0]}
+                      businessName="Juliano Pizzaria"
+                    />
+                  )}
                 </div>
               ))}
             </div>

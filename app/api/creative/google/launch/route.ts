@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
       adGroups: body.adGroups.map((ag: Record<string, unknown>) => ({
         name: ag.name,
         keywords: Array.isArray(ag.keywords) ? ag.keywords : [],
+        negativeKeywords: Array.isArray(ag.negativeKeywords) ? ag.negativeKeywords : [],
         headlines: Array.isArray(ag.headlines) ? ag.headlines : [],
         descriptions: Array.isArray(ag.descriptions) ? ag.descriptions : [],
         images: Array.isArray(ag.images) ? ag.images : [],

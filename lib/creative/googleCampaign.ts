@@ -22,6 +22,7 @@ export type GoogleCampaignAssets = {
 export type GoogleAdGroupInput = {
   name: string;
   keywords: GoogleKeyword[]; // Search only
+  negativeKeywords?: string[]; // Search only — plain text, always exact-match negatives here
   headlines: string[]; // <=30 chars each; Search/Display/PMax need >=3
   descriptions: string[]; // <=90 chars each; needs >=2
   images?: GoogleImageAssetInput[]; // Display / Performance Max
@@ -339,6 +340,15 @@ export async function launchGoogleCampaignTree(input: GoogleCampaignInput): Prom
           auth,
           ag.keywords.map((k) => ({
             create: { adGroup: adGroupResourceName, status: "ENABLED", keyword: { text: k.text, matchType: k.matchType } },
+          }))
+        );
+      }
+      if (input.campaignType === "SEARCH" && ag.negativeKeywords && ag.negativeKeywords.length > 0) {
+        await mutate(
+          "adGroupCriteria",
+          auth,
+          ag.negativeKeywords.map((text) => ({
+            create: { adGroup: adGroupResourceName, status: "ENABLED", negative: true, keyword: { text, matchType: "EXACT" } },
           }))
         );
       }
