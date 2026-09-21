@@ -134,8 +134,35 @@ so the existing token will need to be regenerated), plus `META_PAGE_ID` — the
 Facebook Page ID that ads run from (find it under the Page's About section, or via
 Business Settings → Accounts → Pages).
 
-Google Ads campaign creation isn't built yet — it requires substantially more
-required fields per API call than Meta's flow. Flagged as a fast-follow, not started.
+3. **Google campaign builder & launcher** (`/api/creative/google/copy`,
+   `/api/creative/google/launch`, `/api/creative/google/activate`) — a second
+   platform tab alongside Meta, building Search, Display, or Performance Max
+   campaigns directly via the Google Ads API:
+   - Campaign → one or more ad groups (Search/Display) or asset groups
+     (Performance Max), each with its own headlines (≤30 chars),
+     descriptions (≤90 chars), and — for Display/Performance Max — one or
+     more images.
+   - Search ad groups take keywords typed one per line, using the same
+     syntax as Google Ads Editor: plain text = broad match, `"in quotes"` =
+     phrase match, `[in brackets]` = exact match.
+   - A "Generate headlines, descriptions & keywords" button per ad group
+     calls the Anthropic API (same product/offer/tone/details brief as the
+     Meta copy generator) for AI-written Google-length copy plus keyword
+     ideas, falling back to templates without `ANTHROPIC_API_KEY`.
+   - Performance Max's asset requirements are approximated (Google
+     recommends more headlines/images than the bare minimum used here) —
+     first drafts may need small tweaks in the Google Ads UI before they
+     clear review, flagged in the UI itself.
+
+**Same safety design as Meta**: campaigns, ad groups/asset groups, and ads
+are always created `PAUSED`. A separate "Activate" button is the only thing
+that enables them — never automatic.
+
+**Setup**: reuses the same `GOOGLE_ADS_CLIENT_ID`, `GOOGLE_ADS_CLIENT_SECRET`,
+`GOOGLE_ADS_REFRESH_TOKEN`, `GOOGLE_ADS_CUSTOMER_ID` credentials as the
+read-only reporting integration above — no extra setup needed as long as the
+OAuth token was authorized with the `https://www.googleapis.com/auth/adwords`
+scope (which grants both read and write).
 
 ## Deploy on Vercel
 

@@ -14,13 +14,29 @@ export type BudgetType = "daily" | "lifetime";
 export type PlacementMode = "automatic" | "manual";
 export type PlacementOption =
   | "facebook_feed"
-  | "instagram_feed"
+  | "facebook_right_column"
+  | "facebook_video_feeds"
+  | "facebook_marketplace"
   | "facebook_stories"
-  | "instagram_stories"
   | "facebook_reels"
+  | "facebook_reels_overlay"
+  | "facebook_search"
+  | "facebook_instream_video"
+  | "facebook_profile_feed"
+  | "instagram_feed"
+  | "instagram_stories"
   | "instagram_reels"
-  | "marketplace"
-  | "audience_network";
+  | "instagram_explore"
+  | "instagram_explore_home"
+  | "instagram_profile_feed"
+  | "instagram_search"
+  | "instagram_shop"
+  | "messenger_inbox"
+  | "messenger_stories"
+  | "messenger_sponsored"
+  | "audience_network_classic"
+  | "audience_network_rewarded"
+  | "threads_feed";
 
 const CTA_MAP: Record<string, string> = {
   "Order Now": "ORDER_NOW",
@@ -36,35 +52,112 @@ function placementFields(selected: PlacementOption[]) {
   const platforms = new Set<string>();
   const facebookPositions = new Set<string>();
   const instagramPositions = new Set<string>();
+  const messengerPositions = new Set<string>();
+  const audienceNetworkPositions = new Set<string>();
   for (const p of selected) {
-    if (p === "facebook_feed") {
-      platforms.add("facebook");
-      facebookPositions.add("feed");
-    } else if (p === "instagram_feed") {
-      platforms.add("instagram");
-      instagramPositions.add("stream");
-    } else if (p === "facebook_stories") {
-      platforms.add("facebook");
-      facebookPositions.add("story");
-    } else if (p === "instagram_stories") {
-      platforms.add("instagram");
-      instagramPositions.add("story");
-    } else if (p === "facebook_reels") {
-      platforms.add("facebook");
-      facebookPositions.add("facebook_reels");
-    } else if (p === "instagram_reels") {
-      platforms.add("instagram");
-      instagramPositions.add("reels");
-    } else if (p === "marketplace") {
-      platforms.add("facebook");
-      facebookPositions.add("marketplace");
-    } else if (p === "audience_network") {
-      platforms.add("audience_network");
+    switch (p) {
+      case "facebook_feed":
+        platforms.add("facebook");
+        facebookPositions.add("feed");
+        break;
+      case "facebook_right_column":
+        platforms.add("facebook");
+        facebookPositions.add("right_hand_column");
+        break;
+      case "facebook_video_feeds":
+        platforms.add("facebook");
+        facebookPositions.add("video_feeds");
+        break;
+      case "facebook_marketplace":
+        platforms.add("facebook");
+        facebookPositions.add("marketplace");
+        break;
+      case "facebook_stories":
+        platforms.add("facebook");
+        facebookPositions.add("story");
+        break;
+      case "facebook_reels":
+        platforms.add("facebook");
+        facebookPositions.add("facebook_reels");
+        break;
+      case "facebook_reels_overlay":
+        platforms.add("facebook");
+        facebookPositions.add("facebook_reels_overlay");
+        break;
+      case "facebook_search":
+        platforms.add("facebook");
+        facebookPositions.add("search");
+        break;
+      case "facebook_instream_video":
+        platforms.add("facebook");
+        facebookPositions.add("instream_video");
+        break;
+      case "facebook_profile_feed":
+        platforms.add("facebook");
+        facebookPositions.add("profile_feed");
+        break;
+      case "instagram_feed":
+        platforms.add("instagram");
+        instagramPositions.add("stream");
+        break;
+      case "instagram_stories":
+        platforms.add("instagram");
+        instagramPositions.add("story");
+        break;
+      case "instagram_reels":
+        platforms.add("instagram");
+        instagramPositions.add("reels");
+        break;
+      case "instagram_explore":
+        platforms.add("instagram");
+        instagramPositions.add("explore");
+        break;
+      case "instagram_explore_home":
+        platforms.add("instagram");
+        instagramPositions.add("explore_home");
+        break;
+      case "instagram_profile_feed":
+        platforms.add("instagram");
+        instagramPositions.add("profile_feed");
+        break;
+      case "instagram_search":
+        platforms.add("instagram");
+        instagramPositions.add("ig_search");
+        break;
+      case "instagram_shop":
+        platforms.add("instagram");
+        instagramPositions.add("shop");
+        break;
+      case "messenger_inbox":
+        platforms.add("messenger");
+        messengerPositions.add("messenger_home");
+        break;
+      case "messenger_stories":
+        platforms.add("messenger");
+        messengerPositions.add("story");
+        break;
+      case "messenger_sponsored":
+        platforms.add("messenger");
+        messengerPositions.add("sponsored_messages");
+        break;
+      case "audience_network_classic":
+        platforms.add("audience_network");
+        audienceNetworkPositions.add("classic");
+        break;
+      case "audience_network_rewarded":
+        platforms.add("audience_network");
+        audienceNetworkPositions.add("rewarded_video");
+        break;
+      case "threads_feed":
+        platforms.add("threads");
+        break;
     }
   }
   const out: Record<string, unknown> = { publisher_platforms: [...platforms] };
   if (facebookPositions.size > 0) out.facebook_positions = [...facebookPositions];
   if (instagramPositions.size > 0) out.instagram_positions = [...instagramPositions];
+  if (messengerPositions.size > 0) out.messenger_positions = [...messengerPositions];
+  if (audienceNetworkPositions.size > 0) out.audience_network_positions = [...audienceNetworkPositions];
   return out;
 }
 
