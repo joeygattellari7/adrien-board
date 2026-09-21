@@ -49,6 +49,7 @@ const GOOGLE_CAMPAIGN_TYPES: { value: GoogleCampaignType; label: string; helper:
 ];
 
 const GOOGLE_CTA_OPTIONS = ["Learn More", "Shop Now", "Sign Up", "Order Now", "Get Quote", "Subscribe", "Visit Site", "Watch Now"];
+const STRUCTURED_SNIPPET_HEADERS = ["Brands", "Types", "Styles", "Amenities", "Services", "Destinations", "Menu", "Courses"];
 
 let idCounter = 0;
 function newId() {
@@ -252,6 +253,8 @@ type LocalGoogleAdGroup = {
   headlines: string[];
   descriptions: string[];
   images: LocalGoogleImage[];
+  videoId: string; // YouTube video ID or URL — Video campaigns only
+  callToAction: string; // Video campaigns only
 };
 
 function newGoogleAdGroup(index: number): LocalGoogleAdGroup {
@@ -262,8 +265,13 @@ function newGoogleAdGroup(index: number): LocalGoogleAdGroup {
     headlines: ["", "", ""],
     descriptions: ["", ""],
     images: [],
+    videoId: "",
+    callToAction: "Learn More",
   };
 }
+
+type LocalSitelink = { id: string; text: string; description1: string; description2: string; finalUrl: string };
+type LocalStructuredSnippet = { id: string; header: string; valuesText: string };
 
 function parseKeywordLines(text: string): { text: string; matchType: GoogleMatchType }[] {
   return text
@@ -521,6 +529,38 @@ export default function CreativeFactory() {
   const [gActivating, setGActivating] = useState(false);
   const [gActivated, setGActivated] = useState(false);
 
+  const [gSitelinks, setGSitelinks] = useState<LocalSitelink[]>([]);
+  const [gCallouts, setGCallouts] = useState<string[]>([]);
+  const [gSnippets, setGSnippets] = useState<LocalStructuredSnippet[]>([]);
+
+  function addSitelink() {
+    setGSitelinks((prev) => [...prev, { id: newId(), text: "", description1: "", description2: "", finalUrl: "" }]);
+  }
+  function updateSitelink(id: string, patch: Partial<LocalSitelink>) {
+    setGSitelinks((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  }
+  function removeSitelink(id: string) {
+    setGSitelinks((prev) => prev.filter((s) => s.id !== id));
+  }
+  function addCallout() {
+    setGCallouts((prev) => [...prev, ""]);
+  }
+  function updateCallout(idx: number, value: string) {
+    setGCallouts((prev) => prev.map((c, i) => (i === idx ? value : c)));
+  }
+  function removeCallout(idx: number) {
+    setGCallouts((prev) => prev.filter((_, i) => i !== idx));
+  }
+  function addSnippet() {
+    setGSnippets((prev) => [...prev, { id: newId(), header: STRUCTURED_SNIPPET_HEADERS[0], valuesText: "" }]);
+  }
+  function updateSnippet(id: string, patch: Partial<LocalStructuredSnippet>) {
+    setGSnippets((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  }
+  function removeSnippet(id: string) {
+    setGSnippets((prev) => prev.filter((s) => s.id !== id));
+  }
+
   function updateGoogleAdGroup(id: string, patch: Partial<LocalGoogleAdGroup>) {
     setGAdGroups((prev) => prev.map((ag) => (ag.id === id ? { ...ag, ...patch } : ag)));
   }
@@ -597,8 +637,23 @@ export default function CreativeFactory() {
           headlines: ag.headlines.filter(Boolean),
           descriptions: ag.descriptions.filter(Boolean),
           images: await Promise.all(ag.images.map(async (img) => ({ base64: await fileToBase64(img.file) }))),
+          videoId: ag.videoId || undefined,
+          callToAction: ag.callToAction || undefined,
         }))
       );
+
+      const assetsPayload = {
+        sitelinks: gSitelinks.filter((s) => s.text && s.finalUrl).map((s) => ({
+          text: s.text,
+          description1: s.description1 || undefined,
+          description2: s.description2 || undefined,
+          finalUrl: s.finalUrl,
+        })),
+        callouts: gCallouts.filter(Boolean),
+        structuredSnippets: gSnippets
+          .filter((s) => s.header && s.valuesText.trim())
+          .map((s) => ({ header: s.header, values: s.valuesText.split(",").map((v) => v.trim()).filter(Boolean) })),
+      };
 
       const res = await fetch("/api/creative/google/launch", {
         method: "POST",
@@ -609,6 +664,10 @@ export default function CreativeFactory() {
           dailyBudget: Number(gDailyBudget),
           finalUrl: gFinalUrl,
           adGroups: adGroupsPayload,
+          assets:
+            assetsPayload.sitelinks.length || assetsPayload.callouts.length || assetsPayload.structuredSnippets.length
+              ? assetsPayload
+              : undefined,
         }),
       });
       const data = await res.json();
@@ -875,6 +934,14 @@ export default function CreativeFactory() {
                         <label className="text-xs font-medium text-black/50 dark:text-white/50">Interests (comma-separated)</label>
                         <input value={as.interests} onChange={(e) => updateAdSet(as.id, { interests: e.target.value })} placeholder="e.g. Pizza, Italian cuisine" className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm" />
                       </div>
+                      <div>
+                        <label className="text-xs font-medium text-black/50 dark:text-white/50">Start date (optional)</label>
+                        <input type="datetime-local" value={as.startTime} onChange={(e) => updateAdSet(as.id, { startTime: e.target.value })} className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-black/50 dark:text-white/50">End date (optional{budgetType === "lifetime" ? ", required for lifetime budgets" : ""})</label>
+                        <input type="datetime-local" value={as.endTime} onChange={(e) => updateAdSet(as.id, { endTime: e.target.value })} className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm" />
+                      </div>
                     </div>
 
                     <div className="mb-3">
@@ -929,7 +996,23 @@ export default function CreativeFactory() {
                             </div>
                             <textarea value={ad.primaryText} onChange={(e) => updateAd(as.id, ad.id, { primaryText: e.target.value })} placeholder="Primary text" required rows={2} className="w-full mb-2 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-2.5 py-1.5 text-sm" />
                             <input value={ad.description} onChange={(e) => updateAd(as.id, ad.id, { description: e.target.value })} placeholder="Description" className="w-full mb-2 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-2.5 py-1.5 text-sm" />
-                            <AssetUploader assets={ad.assets} onChange={(assets) => updateAd(as.id, ad.id, { assets })} />
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className="text-[11px] font-medium text-black/50 dark:text-white/50">Format:</span>
+                              <label className="flex items-center gap-1 text-xs">
+                                <input type="radio" checked={ad.format === "auto"} onChange={() => updateAd(as.id, ad.id, { format: "auto" })} />
+                                Single image/video
+                              </label>
+                              <label className={`flex items-center gap-1 text-xs ${ad.assets.filter((a) => a.type === "image").length < 2 ? "opacity-40" : ""}`}>
+                                <input
+                                  type="radio"
+                                  checked={ad.format === "carousel"}
+                                  disabled={ad.assets.filter((a) => a.type === "image").length < 2}
+                                  onChange={() => updateAd(as.id, ad.id, { format: "carousel" })}
+                                />
+                                Carousel (2+ images, each its own card)
+                              </label>
+                            </div>
+                            <AssetUploader assets={ad.assets} onChange={(assets) => updateAd(as.id, ad.id, { assets })} carousel={ad.format === "carousel"} />
                           </div>
                         ))}
                       </div>
@@ -956,7 +1039,10 @@ export default function CreativeFactory() {
             <div className="text-sm font-semibold mb-3">Review before creating in Meta</div>
             <div className="text-xs text-black/50 dark:text-white/50 mb-4 space-y-1">
               <div><span className="font-medium">Campaign:</span> {campaignName} ({OBJECTIVES.find((o) => o.value === objective)?.label})</div>
-              <div><span className="font-medium">Budget:</span> {budgetType} — ${budgetAmount} split across {adSets.length} ad set{adSets.length !== 1 ? "s" : ""}</div>
+              <div>
+                <span className="font-medium">Budget:</span> {budgetType} — ${budgetAmount}{" "}
+                {campaignBudgetOptimization ? "(Advantage+ campaign budget, auto-distributed)" : `split evenly across ${adSets.length} ad set${adSets.length !== 1 ? "s" : ""}`}
+              </div>
               <div><span className="font-medium">Link:</span> {linkUrl}</div>
             </div>
             <div className="space-y-4">
@@ -966,6 +1052,8 @@ export default function CreativeFactory() {
                   <div className="text-xs text-black/50 dark:text-white/50 mb-2">
                     {as.locationQuery ? `${as.locationQuery} (${as.radiusKm}km)` : as.countries}, ages {as.ageMin}-{as.ageMax}, {as.gender}
                     {as.interests ? `, interests: ${as.interests}` : ""} — placements: {as.placementMode === "automatic" ? "automatic" : as.manualPlacements.join(", ") || "none selected"}
+                    {as.startTime ? `, starts ${new Date(as.startTime).toLocaleString()}` : ""}
+                    {as.endTime ? `, ends ${new Date(as.endTime).toLocaleString()}` : ""}
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {as.ads.map((ad) => (
@@ -1178,7 +1266,25 @@ export default function CreativeFactory() {
                       </div>
                     </div>
 
-                    {gCampaignType !== "SEARCH" && (
+                    {gCampaignType === "VIDEO" && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                        <div>
+                          <label className="text-xs font-medium text-black/50 dark:text-white/50">YouTube video URL or ID</label>
+                          <input value={ag.videoId} onChange={(e) => updateGoogleAdGroup(ag.id, { videoId: e.target.value })} required placeholder="https://youtube.com/watch?v=..." className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm" />
+                          <p className="text-[10px] text-black/40 dark:text-white/40 mt-1">Must already be uploaded to a YouTube channel — Google Ads can't host new video files directly.</p>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-black/50 dark:text-white/50">Call to action</label>
+                          <select value={ag.callToAction} onChange={(e) => updateGoogleAdGroup(ag.id, { callToAction: e.target.value })} className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm">
+                            {GOOGLE_CTA_OPTIONS.map((c) => (
+                              <option key={c} value={c}>{c}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    {(gCampaignType === "DISPLAY" || gCampaignType === "PERFORMANCE_MAX") && (
                       <div>
                         <label className="text-xs font-medium text-black/50 dark:text-white/50 block mb-1">Images</label>
                         <GoogleImageUploader images={ag.images} onChange={(images) => updateGoogleAdGroup(ag.id, { images })} />
@@ -1190,6 +1296,60 @@ export default function CreativeFactory() {
               <button type="button" onClick={addGoogleAdGroup} className="mt-3 rounded-lg border border-amber-500/40 text-amber-700 dark:text-amber-400 text-sm font-medium px-4 py-2 hover:bg-amber-50 dark:hover:bg-amber-950/30">
                 + Add another ad group
               </button>
+            </div>
+
+            <div className="rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900 p-4">
+              <div className="text-sm font-semibold mb-1">3. Assets (campaign-level)</div>
+              <p className="text-xs text-black/50 dark:text-white/50 mb-3">
+                Sitelinks, callouts, and structured snippets — Google's current name for what used to be called ad extensions. Optional, but they improve ad rank and can show under any ad in this campaign.
+              </p>
+
+              <div className="mb-4">
+                <div className="text-xs font-semibold mb-1.5">Sitelinks</div>
+                <div className="space-y-2">
+                  {gSitelinks.map((s) => (
+                    <div key={s.id} className="grid grid-cols-1 md:grid-cols-5 gap-1.5 items-center">
+                      <input value={s.text} onChange={(e) => updateSitelink(s.id, { text: e.target.value })} placeholder="Link text (e.g. Menu)" className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-2.5 py-1.5 text-xs" />
+                      <input value={s.description1} onChange={(e) => updateSitelink(s.id, { description1: e.target.value })} placeholder="Description line 1" className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-2.5 py-1.5 text-xs" />
+                      <input value={s.description2} onChange={(e) => updateSitelink(s.id, { description2: e.target.value })} placeholder="Description line 2" className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-2.5 py-1.5 text-xs" />
+                      <input value={s.finalUrl} onChange={(e) => updateSitelink(s.id, { finalUrl: e.target.value })} placeholder="URL" className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-2.5 py-1.5 text-xs" />
+                      <button type="button" onClick={() => removeSitelink(s.id)} className="text-xs text-red-600 dark:text-red-400 hover:underline justify-self-start">Remove</button>
+                    </div>
+                  ))}
+                </div>
+                <button type="button" onClick={addSitelink} className="mt-1.5 text-xs font-medium text-amber-700 dark:text-amber-400 hover:underline">+ Add sitelink</button>
+              </div>
+
+              <div className="mb-4">
+                <div className="text-xs font-semibold mb-1.5">Callouts</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {gCallouts.map((c, i) => (
+                    <div key={i} className="flex items-center gap-1">
+                      <input value={c} onChange={(e) => updateCallout(i, e.target.value)} placeholder="e.g. Free delivery" maxLength={25} className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-2.5 py-1.5 text-xs w-40" />
+                      <button type="button" onClick={() => removeCallout(i)} className="text-red-600 dark:text-red-400 text-sm px-1">×</button>
+                    </div>
+                  ))}
+                </div>
+                <button type="button" onClick={addCallout} className="mt-1.5 text-xs font-medium text-amber-700 dark:text-amber-400 hover:underline">+ Add callout</button>
+              </div>
+
+              <div>
+                <div className="text-xs font-semibold mb-1.5">Structured snippets</div>
+                <div className="space-y-2">
+                  {gSnippets.map((s) => (
+                    <div key={s.id} className="grid grid-cols-1 md:grid-cols-[140px_1fr_auto] gap-1.5 items-center">
+                      <select value={s.header} onChange={(e) => updateSnippet(s.id, { header: e.target.value })} className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-2.5 py-1.5 text-xs">
+                        {STRUCTURED_SNIPPET_HEADERS.map((h) => (
+                          <option key={h} value={h}>{h}</option>
+                        ))}
+                      </select>
+                      <input value={s.valuesText} onChange={(e) => updateSnippet(s.id, { valuesText: e.target.value })} placeholder="Comma-separated values, e.g. Margherita, Pepperoni, Vegetarian" className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-2.5 py-1.5 text-xs" />
+                      <button type="button" onClick={() => removeSnippet(s.id)} className="text-xs text-red-600 dark:text-red-400 hover:underline">Remove</button>
+                    </div>
+                  ))}
+                </div>
+                <button type="button" onClick={addSnippet} className="mt-1.5 text-xs font-medium text-amber-700 dark:text-amber-400 hover:underline">+ Add structured snippet</button>
+              </div>
             </div>
 
             <button type="submit" className="rounded-lg bg-amber-600 text-white text-sm font-medium px-4 py-2 hover:bg-amber-700">
@@ -1205,6 +1365,11 @@ export default function CreativeFactory() {
               <div><span className="font-medium">Campaign:</span> {gCampaignName} ({GOOGLE_CAMPAIGN_TYPES.find((t) => t.value === gCampaignType)?.label})</div>
               <div><span className="font-medium">Budget:</span> ${gDailyBudget}/day</div>
               <div><span className="font-medium">Final URL:</span> {gFinalUrl}</div>
+              {(gSitelinks.length > 0 || gCallouts.filter(Boolean).length > 0 || gSnippets.length > 0) && (
+                <div>
+                  <span className="font-medium">Assets:</span> {gSitelinks.length} sitelink{gSitelinks.length !== 1 ? "s" : ""}, {gCallouts.filter(Boolean).length} callout{gCallouts.filter(Boolean).length !== 1 ? "s" : ""}, {gSnippets.length} structured snippet{gSnippets.length !== 1 ? "s" : ""}
+                </div>
+              )}
             </div>
             <div className="space-y-3">
               {gAdGroups.map((ag) => (
@@ -1215,13 +1380,19 @@ export default function CreativeFactory() {
                       {parseKeywordLines(ag.keywordsText).length} keyword{parseKeywordLines(ag.keywordsText).length !== 1 ? "s" : ""}
                     </div>
                   )}
-                  <div className="flex gap-2 mb-2">
-                    {ag.images.slice(0, 3).map((img) => (
-                      <div key={img.id} className="w-10 h-10 rounded overflow-hidden bg-black/5 dark:bg-white/5 flex-shrink-0">
-                        <img src={URL.createObjectURL(img.file)} alt="" className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                  </div>
+                  {gCampaignType === "VIDEO" ? (
+                    <div className="text-xs text-black/50 dark:text-white/50 mb-2">
+                      🎬 {ag.videoId || "(no video)"} — CTA: {ag.callToAction}
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 mb-2">
+                      {ag.images.slice(0, 3).map((img) => (
+                        <div key={img.id} className="w-10 h-10 rounded overflow-hidden bg-black/5 dark:bg-white/5 flex-shrink-0">
+                          <img src={URL.createObjectURL(img.file)} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <div className="font-medium text-sm">{ag.headlines.filter(Boolean)[0] || "(no headline)"}</div>
                   <div className="text-xs text-black/60 dark:text-white/60">{ag.descriptions.filter(Boolean)[0] || "(no description)"}</div>
                 </div>
