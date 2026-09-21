@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CopyVariation } from "@/lib/creative/generateCopy";
-import { Gender, MetaObjective } from "@/lib/creative/metaCampaign";
+import { BudgetType, Gender, MetaObjective, PlacementMode, PlacementOption } from "@/lib/creative/metaCampaign";
 
 const OBJECTIVES: { value: MetaObjective; label: string }[] = [
   { value: "OUTCOME_TRAFFIC", label: "Traffic (clicks to site)" },
@@ -13,14 +13,77 @@ const OBJECTIVES: { value: MetaObjective; label: string }[] = [
 
 const CTA_OPTIONS = ["Order Now", "Learn More", "Shop Now", "Get Offer", "Sign Up"];
 const CONVERSION_EVENTS = ["PURCHASE", "ADD_TO_CART", "INITIATE_CHECKOUT", "LEAD", "COMPLETE_REGISTRATION"];
+const PLACEMENT_OPTIONS: { value: PlacementOption; label: string }[] = [
+  { value: "facebook_feed", label: "Facebook Feed" },
+  { value: "instagram_feed", label: "Instagram Feed" },
+  { value: "facebook_stories", label: "Facebook Stories" },
+  { value: "instagram_stories", label: "Instagram Stories" },
+  { value: "facebook_reels", label: "Facebook Reels" },
+  { value: "instagram_reels", label: "Instagram Reels" },
+  { value: "marketplace", label: "Marketplace" },
+  { value: "audience_network", label: "Audience Network" },
+];
 
-type LaunchResult = {
-  campaignId: string;
-  adSetId: string;
-  adId: string;
-  manageUrl: string;
-  status: string;
+let idCounter = 0;
+function newId() {
+  idCounter += 1;
+  return `id-${idCounter}`;
+}
+
+type LocalAsset = { id: string; file: File; type: "image" | "video"; format: "1:1" | "9:16" };
+type LocalAd = {
+  id: string;
+  name: string;
+  headline: string;
+  primaryText: string;
+  description: string;
+  cta: string;
+  assets: LocalAsset[];
 };
+type LocalAdSet = {
+  id: string;
+  name: string;
+  locationQuery: string;
+  radiusKm: string;
+  countries: string;
+  ageMin: string;
+  ageMax: string;
+  gender: Gender;
+  interests: string;
+  placementMode: PlacementMode;
+  manualPlacements: PlacementOption[];
+  ads: LocalAd[];
+};
+
+function newAd(defaults?: Partial<LocalAd>): LocalAd {
+  return {
+    id: newId(),
+    name: "Ad",
+    headline: "",
+    primaryText: "",
+    description: "",
+    cta: "Order Now",
+    assets: [],
+    ...defaults,
+  };
+}
+
+function newAdSet(index: number): LocalAdSet {
+  return {
+    id: newId(),
+    name: `Ad Set ${index}`,
+    locationQuery: "",
+    radiusKm: "10",
+    countries: "AU",
+    ageMin: "18",
+    ageMax: "65",
+    gender: "all",
+    interests: "",
+    placementMode: "automatic",
+    manualPlacements: [],
+    ads: [newAd()],
+  };
+}
 
 async function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -31,37 +94,81 @@ async function fileToBase64(file: File): Promise<string> {
   });
 }
 
-function ImageDrop({
-  label,
-  ratioClass,
-  file,
-  onChange,
-}: {
-  label: string;
-  ratioClass: string;
-  file: File | null;
-  onChange: (f: File | null) => void;
-}) {
-  const url = file ? URL.createObjectURL(file) : null;
+function AssetUploader({ assets, onChange }: { assets: LocalAsset[]; onChange: (assets: LocalAsset[]) => void }) {
+  function addFile(file: File, type: "image" | "video", format: "1:1" | "9:16") {
+    onChange([...assets, { id: newId(), file, type, format }]);
+  }
+  function remove(id: string) {
+    onChange(assets.filter((a) => a.id !== id));
+  }
+
   return (
     <div>
-      <label className="text-xs font-medium text-black/50 dark:text-white/50">{label}</label>
-      <div className={`mt-1 relative w-full max-w-[220px] ${ratioClass} rounded-lg border border-dashed border-black/20 dark:border-white/20 bg-black/5 dark:bg-white/5 overflow-hidden flex items-center justify-center`}>
-        {url ? (
-          <img src={url} alt={label} className="absolute inset-0 w-full h-full object-cover" />
-        ) : (
-          <span className="text-xs text-black/40 dark:text-white/40 px-2 text-center">No image</span>
-        )}
+      <div className="flex flex-wrap gap-2 mb-2">
+        {assets.map((a) => (
+          <div key={a.id} className="relative w-20 h-20 rounded-lg border border-black/10 dark:border-white/10 overflow-hidden bg-black/5 dark:bg-white/5">
+            {a.type === "image" ? (
+              <img src={URL.createObjectURL(a.file)} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-xs text-black/50 dark:text-white/50">
+                🎬 video
+              </div>
+            )}
+            <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] text-center py-0.5">{a.format}</div>
+            <button
+              onClick={() => remove(a.id)}
+              className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/70 text-white text-[10px] flex items-center justify-center"
+            >
+              ×
+            </button>
+          </div>
+        ))}
       </div>
-      <input
-        type="file"
-        accept="image/*"
-        onChange={(e) => onChange(e.target.files?.[0] ?? null)}
-        className="w-full mt-2 text-xs"
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="file"
+          accept="image/*,video/*"
+          id={`asset-input-${assets.length}-${Math.random()}`}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const isVideo = file.type.startsWith("video/");
+            addFile(file, isVideo ? "video" : "image", "1:1");
+            e.target.value = "";
+          }}
+          className="text-xs"
+        />
+        <span className="text-[10px] text-black/40 dark:text-white/40">Add image or video, then set its format below</span>
+      </div>
+      {assets.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {assets.map((a) => (
+            <div key={a.id} className="flex items-center gap-2 text-xs">
+              <span className="text-black/50 dark:text-white/50 truncate max-w-[120px]">{a.file.name}</span>
+              <select
+                value={a.format}
+                onChange={(e) =>
+                  onChange(assets.map((x) => (x.id === a.id ? { ...x, format: e.target.value as "1:1" | "9:16" } : x)))
+                }
+                className="rounded border border-black/15 dark:border-white/15 bg-transparent px-1.5 py-0.5 text-xs"
+              >
+                <option value="1:1">1:1 Square</option>
+                <option value="9:16">9:16 Vertical</option>
+              </select>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
+
+type LaunchResult = {
+  campaignId: string;
+  adSets: { adSetId: string; adSetName: string; ads: { adId: string; adName: string }[] }[];
+  manageUrl: string;
+  status: string;
+};
 
 export default function CreativeFactory() {
   // Copy generator state
@@ -72,32 +179,19 @@ export default function CreativeFactory() {
   const [generating, setGenerating] = useState(false);
   const [copySource, setCopySource] = useState<"ai" | "template" | null>(null);
   const [variations, setVariations] = useState<CopyVariation[]>([]);
+  const [copyTargetAdSetId, setCopyTargetAdSetId] = useState<string | null>(null);
+  const [copyTargetAdId, setCopyTargetAdId] = useState<string | null>(null);
 
-  // Campaign builder state
+  // Campaign-level state
   const [campaignName, setCampaignName] = useState("");
-  const [adSetName, setAdSetName] = useState("");
   const [objective, setObjective] = useState<MetaObjective>("OUTCOME_TRAFFIC");
-  const [dailyBudget, setDailyBudget] = useState("20");
+  const [budgetType, setBudgetType] = useState<BudgetType>("daily");
+  const [budgetAmount, setBudgetAmount] = useState("20");
   const [linkUrl, setLinkUrl] = useState("");
-  const [headline, setHeadline] = useState("");
-  const [primaryText, setPrimaryText] = useState("");
-  const [description, setDescription] = useState("");
-  const [cta, setCta] = useState("Order Now");
-
-  // Targeting
-  const [countries, setCountries] = useState("AU");
-  const [ageMin, setAgeMin] = useState("18");
-  const [ageMax, setAgeMax] = useState("65");
-  const [gender, setGender] = useState<Gender>("all");
-  const [interests, setInterests] = useState("");
-
-  // Conversion objective
   const [pixelId, setPixelId] = useState("");
   const [conversionEvent, setConversionEvent] = useState("PURCHASE");
 
-  // Images
-  const [squareImage, setSquareImage] = useState<File | null>(null);
-  const [verticalImage, setVerticalImage] = useState<File | null>(null);
+  const [adSets, setAdSets] = useState<LocalAdSet[]>([newAdSet(1)]);
 
   const [previewing, setPreviewing] = useState(false);
   const [launching, setLaunching] = useState(false);
@@ -106,6 +200,40 @@ export default function CreativeFactory() {
   const [activating, setActivating] = useState(false);
   const [activated, setActivated] = useState(false);
 
+  function updateAdSet(id: string, patch: Partial<LocalAdSet>) {
+    setAdSets((prev) => prev.map((as) => (as.id === id ? { ...as, ...patch } : as)));
+  }
+  function addAdSet() {
+    setAdSets((prev) => [...prev, newAdSet(prev.length + 1)]);
+  }
+  function removeAdSet(id: string) {
+    setAdSets((prev) => prev.filter((as) => as.id !== id));
+  }
+  function updateAd(adSetId: string, adId: string, patch: Partial<LocalAd>) {
+    setAdSets((prev) =>
+      prev.map((as) =>
+        as.id !== adSetId ? as : { ...as, ads: as.ads.map((ad) => (ad.id === adId ? { ...ad, ...patch } : ad)) }
+      )
+    );
+  }
+  function addAd(adSetId: string) {
+    setAdSets((prev) =>
+      prev.map((as) => (as.id !== adSetId ? as : { ...as, ads: [...as.ads, newAd({ name: `Ad ${as.ads.length + 1}` })] }))
+    );
+  }
+  function removeAd(adSetId: string, adId: string) {
+    setAdSets((prev) => prev.map((as) => (as.id !== adSetId ? as : { ...as, ads: as.ads.filter((ad) => ad.id !== adId) })));
+  }
+  function toggleManualPlacement(adSetId: string, p: PlacementOption) {
+    setAdSets((prev) =>
+      prev.map((as) => {
+        if (as.id !== adSetId) return as;
+        const has = as.manualPlacements.includes(p);
+        return { ...as, manualPlacements: has ? as.manualPlacements.filter((x) => x !== p) : [...as.manualPlacements, p] };
+      })
+    );
+  }
+
   async function handleGenerateCopy(e: React.FormEvent) {
     e.preventDefault();
     setGenerating(true);
@@ -113,13 +241,7 @@ export default function CreativeFactory() {
       const res = await fetch("/api/creative/copy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          product,
-          offer: offer || undefined,
-          tone: tone || undefined,
-          details: details || undefined,
-          count: 3,
-        }),
+        body: JSON.stringify({ product, offer: offer || undefined, tone: tone || undefined, details: details || undefined, count: 3 }),
       });
       const data = await res.json();
       setVariations(data.variations ?? []);
@@ -130,14 +252,13 @@ export default function CreativeFactory() {
   }
 
   function useVariation(v: CopyVariation) {
-    setHeadline(v.headline);
-    setPrimaryText(v.primaryText);
-    setDescription(v.description);
-    setCta(v.cta);
-    if (!campaignName) {
-      const base = `${product} — ${new Date().toLocaleDateString()}`;
-      setCampaignName(base);
-      setAdSetName(`${base} — Ad Set`);
+    if (copyTargetAdSetId && copyTargetAdId) {
+      updateAd(copyTargetAdSetId, copyTargetAdId, {
+        headline: v.headline,
+        primaryText: v.primaryText,
+        description: v.description,
+        cta: v.cta,
+      });
     }
   }
 
@@ -153,38 +274,54 @@ export default function CreativeFactory() {
     setLaunchResult(null);
     setActivated(false);
     try {
-      const squareImageBase64 = squareImage ? await fileToBase64(squareImage) : undefined;
-      const verticalImageBase64 = verticalImage ? await fileToBase64(verticalImage) : undefined;
+      const adSetsPayload = await Promise.all(
+        adSets.map(async (as) => ({
+          name: as.name,
+          locationQuery: as.locationQuery || undefined,
+          radiusKm: as.radiusKm ? Number(as.radiusKm) : undefined,
+          countries: as.locationQuery ? [] : as.countries.split(",").map((c) => c.trim().toUpperCase()).filter(Boolean),
+          ageMin: Number(as.ageMin),
+          ageMax: Number(as.ageMax),
+          gender: as.gender,
+          interests: as.interests || undefined,
+          placementMode: as.placementMode,
+          manualPlacements: as.placementMode === "manual" ? as.manualPlacements : undefined,
+          ads: await Promise.all(
+            as.ads.map(async (ad) => ({
+              name: ad.name,
+              headline: ad.headline,
+              primaryText: ad.primaryText,
+              description: ad.description,
+              cta: ad.cta,
+              assets: await Promise.all(
+                ad.assets.map(async (asset) => ({
+                  base64: await fileToBase64(asset.file),
+                  type: asset.type,
+                  format: asset.format,
+                }))
+              ),
+            }))
+          ),
+        }))
+      );
+
       const res = await fetch("/api/creative/launch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           campaignName,
-          adSetName,
           objective,
-          dailyBudget: Number(dailyBudget),
-          headline,
-          primaryText,
-          description,
-          cta,
+          budgetType,
+          budgetAmount: Number(budgetAmount),
           linkUrl,
-          targeting: {
-            countries: countries.split(",").map((c) => c.trim().toUpperCase()).filter(Boolean),
-            ageMin: Number(ageMin),
-            ageMax: Number(ageMax),
-            gender,
-            interests: interests || undefined,
-          },
           pixelId: objective === "OUTCOME_SALES" ? pixelId : undefined,
           conversionEvent: objective === "OUTCOME_SALES" ? conversionEvent : undefined,
-          squareImageBase64,
-          verticalImageBase64,
+          adSets: adSetsPayload,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
         setLaunchError(data.error ?? "Failed to create campaign");
-        setPreviewing(false);
         return;
       }
       setLaunchResult(data);
@@ -201,7 +338,7 @@ export default function CreativeFactory() {
       const res = await fetch("/api/creative/activate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ adId: launchResult.adId, adSetId: launchResult.adSetId }),
+        body: JSON.stringify(launchResult),
       });
       const data = await res.json();
       if (res.ok) setActivated(true);
@@ -210,6 +347,8 @@ export default function CreativeFactory() {
       setActivating(false);
     }
   }
+
+  const totalAds = adSets.reduce((sum, as) => sum + as.ads.length, 0);
 
   return (
     <div className="max-w-6xl mx-auto px-4 pb-8">
@@ -223,49 +362,49 @@ export default function CreativeFactory() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
             <div>
               <label className="text-xs font-medium text-black/50 dark:text-white/50">Product / focus</label>
-              <input
-                value={product}
-                onChange={(e) => setProduct(e.target.value)}
-                className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-                placeholder="e.g. Margherita Pizza"
-              />
+              <input value={product} onChange={(e) => setProduct(e.target.value)} className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm" placeholder="e.g. Margherita Pizza" />
             </div>
             <div>
               <label className="text-xs font-medium text-black/50 dark:text-white/50">Offer (optional)</label>
-              <input
-                value={offer}
-                onChange={(e) => setOffer(e.target.value)}
-                className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-                placeholder="e.g. 20% off this weekend"
-              />
+              <input value={offer} onChange={(e) => setOffer(e.target.value)} className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm" placeholder="e.g. 20% off this weekend" />
             </div>
             <div>
               <label className="text-xs font-medium text-black/50 dark:text-white/50">Tone (optional)</label>
-              <input
-                value={tone}
-                onChange={(e) => setTone(e.target.value)}
-                className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-                placeholder="e.g. fun and casual"
-              />
+              <input value={tone} onChange={(e) => setTone(e.target.value)} className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm" placeholder="e.g. fun and casual" />
             </div>
           </div>
           <div className="mb-3">
             <label className="text-xs font-medium text-black/50 dark:text-white/50">Extra details / brief (optional)</label>
-            <textarea
-              value={details}
-              onChange={(e) => setDetails(e.target.value)}
-              rows={3}
-              placeholder="Anything else the copy should reflect — must-include phrases, brand guidelines, specific ingredients, promo terms, etc."
-              className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-            />
+            <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={3} placeholder="Anything else the copy should reflect — must-include phrases, brand guidelines, specific ingredients, promo terms, etc." className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm" />
           </div>
-          <button
-            type="submit"
-            disabled={generating || !product}
-            className="rounded-lg bg-purple-600 text-white text-sm font-medium px-4 py-2 hover:bg-purple-700 disabled:opacity-50"
-          >
-            {generating ? "Generating…" : "Generate copy"}
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="submit" disabled={generating || !product} className="rounded-lg bg-purple-600 text-white text-sm font-medium px-4 py-2 hover:bg-purple-700 disabled:opacity-50">
+              {generating ? "Generating…" : "Generate copy"}
+            </button>
+            {adSets.some((as) => as.ads.length > 0) && (
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-black/50 dark:text-white/50">Apply to:</span>
+                <select
+                  value={copyTargetAdSetId && copyTargetAdId ? `${copyTargetAdSetId}::${copyTargetAdId}` : ""}
+                  onChange={(e) => {
+                    const [asId, adId] = e.target.value.split("::");
+                    setCopyTargetAdSetId(asId ?? null);
+                    setCopyTargetAdId(adId ?? null);
+                  }}
+                  className="rounded border border-black/15 dark:border-white/15 bg-transparent px-2 py-1 text-xs"
+                >
+                  <option value="">Select an ad…</option>
+                  {adSets.map((as) =>
+                    as.ads.map((ad) => (
+                      <option key={ad.id} value={`${as.id}::${ad.id}`}>
+                        {as.name} — {ad.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+            )}
+          </div>
         </form>
 
         {variations.length > 0 && (
@@ -277,9 +416,10 @@ export default function CreativeFactory() {
                 <div className="text-xs text-black/40 dark:text-white/40 mb-3">{v.description}</div>
                 <button
                   onClick={() => useVariation(v)}
-                  className="w-full rounded-lg border border-purple-500/40 text-purple-700 dark:text-purple-300 text-xs font-medium py-1.5 hover:bg-purple-50 dark:hover:bg-purple-950/30"
+                  disabled={!copyTargetAdSetId || !copyTargetAdId}
+                  className="w-full rounded-lg border border-purple-500/40 text-purple-700 dark:text-purple-300 text-xs font-medium py-1.5 hover:bg-purple-50 dark:hover:bg-purple-950/30 disabled:opacity-40"
                 >
-                  Use this in campaign below
+                  {copyTargetAdId ? "Use for selected ad" : "Select an ad above first"}
                 </button>
               </div>
             ))}
@@ -292,229 +432,197 @@ export default function CreativeFactory() {
         )}
       </section>
 
-      {/* Campaign builder & launcher */}
+      {/* Campaign builder */}
       <section className="mb-10 rounded-2xl border-2 border-blue-500/25 dark:border-blue-400/25 bg-blue-50/40 dark:bg-blue-950/15 p-5 md:p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-2">
           <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
           <h2 className="text-xl font-bold tracking-tight">Campaign Builder — Meta</h2>
         </div>
         <p className="text-sm text-black/50 dark:text-white/50 mb-5">
-          Creates a campaign, ad set, and ad in Meta — always <span className="font-semibold">paused</span>. Nothing
-          spends until you review it and click Activate.
+          Build as many ad sets and ads as you need. Everything is created <span className="font-semibold">paused</span> — nothing spends until you review and click Activate.
         </p>
 
         {!previewing && !launchResult && (
-          <form onSubmit={startPreview} className="rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900 p-4 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-medium text-black/50 dark:text-white/50">Campaign name</label>
-                <input
-                  value={campaignName}
-                  onChange={(e) => setCampaignName(e.target.value)}
-                  required
-                  className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-black/50 dark:text-white/50">Ad set name</label>
-                <input
-                  value={adSetName}
-                  onChange={(e) => setAdSetName(e.target.value)}
-                  required
-                  className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-black/50 dark:text-white/50">Objective</label>
-                <select
-                  value={objective}
-                  onChange={(e) => setObjective(e.target.value as MetaObjective)}
-                  className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-                >
-                  {OBJECTIVES.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-black/50 dark:text-white/50">Daily budget (AUD)</label>
-                <input
-                  type="number"
-                  min={2}
-                  value={dailyBudget}
-                  onChange={(e) => setDailyBudget(e.target.value)}
-                  required
-                  className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="text-xs font-medium text-black/50 dark:text-white/50">Link URL</label>
-                <input
-                  value={linkUrl}
-                  onChange={(e) => setLinkUrl(e.target.value)}
-                  required
-                  placeholder="https://julianopizzaria.bitebusiness.com/"
-                  className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-                />
-              </div>
-            </div>
-
-            {objective === "OUTCOME_SALES" && (
-              <div className="rounded-lg border border-amber-500/30 bg-amber-50 dark:bg-amber-950/20 p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+          <form onSubmit={startPreview} className="space-y-4">
+            {/* Campaign fields */}
+            <div className="rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900 p-4">
+              <div className="text-sm font-semibold mb-3">1. Campaign</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-black/50 dark:text-white/50">Pixel / dataset ID</label>
-                  <input
-                    value={pixelId}
-                    onChange={(e) => setPixelId(e.target.value)}
-                    required
-                    placeholder="Pixel ID from Events Manager"
-                    className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-                  />
+                  <label className="text-xs font-medium text-black/50 dark:text-white/50">Campaign name</label>
+                  <input value={campaignName} onChange={(e) => setCampaignName(e.target.value)} required className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm" />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-black/50 dark:text-white/50">Conversion event</label>
-                  <select
-                    value={conversionEvent}
-                    onChange={(e) => setConversionEvent(e.target.value)}
-                    className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-                  >
-                    {CONVERSION_EVENTS.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
+                  <label className="text-xs font-medium text-black/50 dark:text-white/50">Objective</label>
+                  <select value={objective} onChange={(e) => setObjective(e.target.value as MetaObjective)} className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm">
+                    {OBJECTIVES.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
                   </select>
                 </div>
-                <p className="text-xs text-amber-700 dark:text-amber-400 md:col-span-2">
-                  Note: Juliano Pizzaria's Meta account has no pixel configured yet — this objective will fail until one
-                  is set up.
-                </p>
-              </div>
-            )}
-
-            <div>
-              <div className="text-sm font-semibold mb-2">Audience targeting</div>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-black/50 dark:text-white/50">Countries</label>
-                  <input
-                    value={countries}
-                    onChange={(e) => setCountries(e.target.value)}
-                    placeholder="AU, NZ"
-                    className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-black/50 dark:text-white/50">Age min</label>
-                  <input
-                    type="number"
-                    min={13}
-                    max={65}
-                    value={ageMin}
-                    onChange={(e) => setAgeMin(e.target.value)}
-                    className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-black/50 dark:text-white/50">Age max</label>
-                  <input
-                    type="number"
-                    min={13}
-                    max={65}
-                    value={ageMax}
-                    onChange={(e) => setAgeMax(e.target.value)}
-                    className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-black/50 dark:text-white/50">Gender</label>
-                  <select
-                    value={gender}
-                    onChange={(e) => setGender(e.target.value as Gender)}
-                    className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-                  >
-                    <option value="all">All</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
+                  <label className="text-xs font-medium text-black/50 dark:text-white/50">Budget type</label>
+                  <select value={budgetType} onChange={(e) => setBudgetType(e.target.value as BudgetType)} className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm">
+                    <option value="daily">Daily</option>
+                    <option value="lifetime">Lifetime (30 days)</option>
                   </select>
                 </div>
-                <div className="md:col-span-4">
+                <div>
                   <label className="text-xs font-medium text-black/50 dark:text-white/50">
-                    Interests (comma-separated — matched to Meta's interest targeting by name, best match used)
+                    {budgetType === "daily" ? "Daily" : "Lifetime"} budget (AUD, split evenly across ad sets)
                   </label>
-                  <input
-                    value={interests}
-                    onChange={(e) => setInterests(e.target.value)}
-                    placeholder="e.g. Pizza, Italian cuisine, Food delivery"
-                    className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-                  />
+                  <input type="number" min={2} value={budgetAmount} onChange={(e) => setBudgetAmount(e.target.value)} required className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-xs font-medium text-black/50 dark:text-white/50">Link URL</label>
+                  <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} required placeholder="https://julianopizzaria.bitebusiness.com/" className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm" />
                 </div>
               </div>
+              {objective === "OUTCOME_SALES" && (
+                <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-50 dark:bg-amber-950/20 p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-black/50 dark:text-white/50">Pixel / dataset ID</label>
+                    <input value={pixelId} onChange={(e) => setPixelId(e.target.value)} required placeholder="Pixel ID from Events Manager" className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-black/50 dark:text-white/50">Conversion event</label>
+                    <select value={conversionEvent} onChange={(e) => setConversionEvent(e.target.value)} className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm">
+                      {CONVERSION_EVENTS.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 md:col-span-2">
+                    Note: Juliano Pizzaria's Meta account has no pixel configured yet — this objective will fail until one is set up.
+                  </p>
+                </div>
+              )}
             </div>
 
+            {/* Ad sets */}
             <div>
-              <label className="text-xs font-medium text-black/50 dark:text-white/50">Headline</label>
-              <input
-                value={headline}
-                onChange={(e) => setHeadline(e.target.value)}
-                required
-                className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-black/50 dark:text-white/50">Primary text</label>
-              <textarea
-                value={primaryText}
-                onChange={(e) => setPrimaryText(e.target.value)}
-                required
-                rows={2}
-                className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-              />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-medium text-black/50 dark:text-white/50">Description</label>
-                <input
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-                />
+              <div className="text-sm font-semibold mb-2">2. Ad Sets ({adSets.length})</div>
+              <div className="space-y-3">
+                {adSets.map((as, asIndex) => (
+                  <div key={as.id} className="rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <input
+                        value={as.name}
+                        onChange={(e) => updateAdSet(as.id, { name: e.target.value })}
+                        className="font-semibold text-sm bg-transparent border-b border-transparent hover:border-black/20 dark:hover:border-white/20 focus:border-blue-500 outline-none px-0.5"
+                      />
+                      {adSets.length > 1 && (
+                        <button type="button" onClick={() => removeAdSet(as.id)} className="text-xs text-red-600 dark:text-red-400 hover:underline">
+                          Remove ad set
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
+                      <div className="md:col-span-2">
+                        <label className="text-xs font-medium text-black/50 dark:text-white/50">Location (city/suburb — leave blank to use countries)</label>
+                        <input value={as.locationQuery} onChange={(e) => updateAdSet(as.id, { locationQuery: e.target.value })} placeholder="e.g. Bondi, NSW" className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-black/50 dark:text-white/50">Radius (km)</label>
+                        <input type="number" min={1} max={80} value={as.radiusKm} onChange={(e) => updateAdSet(as.id, { radiusKm: e.target.value })} disabled={!as.locationQuery} className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm disabled:opacity-40" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-black/50 dark:text-white/50">Countries (fallback)</label>
+                        <input value={as.countries} onChange={(e) => updateAdSet(as.id, { countries: e.target.value })} disabled={!!as.locationQuery} placeholder="AU" className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm disabled:opacity-40" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-black/50 dark:text-white/50">Age min</label>
+                        <input type="number" min={13} max={65} value={as.ageMin} onChange={(e) => updateAdSet(as.id, { ageMin: e.target.value })} className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-black/50 dark:text-white/50">Age max</label>
+                        <input type="number" min={13} max={65} value={as.ageMax} onChange={(e) => updateAdSet(as.id, { ageMax: e.target.value })} className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-black/50 dark:text-white/50">Gender</label>
+                        <select value={as.gender} onChange={(e) => updateAdSet(as.id, { gender: e.target.value as Gender })} className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm">
+                          <option value="all">All</option>
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
+                        </select>
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="text-xs font-medium text-black/50 dark:text-white/50">Interests (comma-separated)</label>
+                        <input value={as.interests} onChange={(e) => updateAdSet(as.id, { interests: e.target.value })} placeholder="e.g. Pizza, Italian cuisine" className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm" />
+                      </div>
+                    </div>
+
+                    <div className="mb-3">
+                      <label className="text-xs font-medium text-black/50 dark:text-white/50 block mb-1">Placements</label>
+                      <div className="flex items-center gap-4 mb-2">
+                        <label className="flex items-center gap-1.5 text-xs">
+                          <input type="radio" checked={as.placementMode === "automatic"} onChange={() => updateAdSet(as.id, { placementMode: "automatic" })} />
+                          Automatic (Advantage+)
+                        </label>
+                        <label className="flex items-center gap-1.5 text-xs">
+                          <input type="radio" checked={as.placementMode === "manual"} onChange={() => updateAdSet(as.id, { placementMode: "manual" })} />
+                          Manual
+                        </label>
+                      </div>
+                      {as.placementMode === "manual" && (
+                        <div className="flex flex-wrap gap-2">
+                          {PLACEMENT_OPTIONS.map((p) => (
+                            <label key={p.value} className={`text-xs px-2 py-1 rounded-full border cursor-pointer ${as.manualPlacements.includes(p.value) ? "bg-blue-600 text-white border-blue-600" : "border-black/15 dark:border-white/15"}`}>
+                              <input type="checkbox" checked={as.manualPlacements.includes(p.value)} onChange={() => toggleManualPlacement(as.id, p.value)} className="hidden" />
+                              {p.label}
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Ads within this ad set */}
+                    <div className="mt-4 pt-3 border-t border-black/10 dark:border-white/10">
+                      <div className="text-xs font-semibold mb-2">Ads in this ad set ({as.ads.length})</div>
+                      <div className="space-y-3">
+                        {as.ads.map((ad, adIndex) => (
+                          <div key={ad.id} className="rounded-lg border border-black/10 dark:border-white/10 p-3 bg-black/[0.02] dark:bg-white/[0.02]">
+                            <div className="flex items-center justify-between mb-2">
+                              <input
+                                value={ad.name}
+                                onChange={(e) => updateAd(as.id, ad.id, { name: e.target.value })}
+                                className="text-xs font-medium bg-transparent border-b border-transparent hover:border-black/20 dark:hover:border-white/20 focus:border-blue-500 outline-none"
+                              />
+                              {as.ads.length > 1 && (
+                                <button type="button" onClick={() => removeAd(as.id, ad.id)} className="text-xs text-red-600 dark:text-red-400 hover:underline">
+                                  Remove ad
+                                </button>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
+                              <input value={ad.headline} onChange={(e) => updateAd(as.id, ad.id, { headline: e.target.value })} placeholder="Headline" required className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-2.5 py-1.5 text-sm" />
+                              <select value={ad.cta} onChange={(e) => updateAd(as.id, ad.id, { cta: e.target.value })} className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-2.5 py-1.5 text-sm">
+                                {CTA_OPTIONS.map((c) => (
+                                  <option key={c} value={c}>{c}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <textarea value={ad.primaryText} onChange={(e) => updateAd(as.id, ad.id, { primaryText: e.target.value })} placeholder="Primary text" required rows={2} className="w-full mb-2 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-2.5 py-1.5 text-sm" />
+                            <input value={ad.description} onChange={(e) => updateAd(as.id, ad.id, { description: e.target.value })} placeholder="Description" className="w-full mb-2 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-2.5 py-1.5 text-sm" />
+                            <AssetUploader assets={ad.assets} onChange={(assets) => updateAd(as.id, ad.id, { assets })} />
+                          </div>
+                        ))}
+                      </div>
+                      <button type="button" onClick={() => addAd(as.id)} className="mt-2 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">
+                        + Add another ad to this ad set
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div>
-                <label className="text-xs font-medium text-black/50 dark:text-white/50">Call to action</label>
-                <select
-                  value={cta}
-                  onChange={(e) => setCta(e.target.value)}
-                  className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-                >
-                  {CTA_OPTIONS.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <button type="button" onClick={addAdSet} className="mt-3 rounded-lg border border-blue-500/40 text-blue-700 dark:text-blue-300 text-sm font-medium px-4 py-2 hover:bg-blue-50 dark:hover:bg-blue-950/30">
+                + Add another ad set
+              </button>
             </div>
 
-            <div>
-              <div className="text-sm font-semibold mb-2">Images</div>
-              <p className="text-xs text-black/50 dark:text-white/50 mb-3">
-                Provide both a square (1:1, feeds) and vertical (9:16, Stories/Reels) image and Meta will
-                automatically serve the right one per placement. Either alone also works.
-              </p>
-              <div className="flex flex-wrap gap-6">
-                <ImageDrop label="Square (1:1)" ratioClass="aspect-square" file={squareImage} onChange={setSquareImage} />
-                <ImageDrop label="Vertical (9:16)" ratioClass="aspect-[9/16]" file={verticalImage} onChange={setVerticalImage} />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="rounded-lg bg-blue-600 text-white text-sm font-medium px-4 py-2 hover:bg-blue-700"
-            >
-              Preview ad
+            <button type="submit" className="rounded-lg bg-blue-600 text-white text-sm font-medium px-4 py-2 hover:bg-blue-700">
+              Preview {adSets.length} ad set{adSets.length !== 1 ? "s" : ""} / {totalAds} ad{totalAds !== 1 ? "s" : ""}
             </button>
           </form>
         )}
@@ -522,48 +630,47 @@ export default function CreativeFactory() {
         {previewing && (
           <div className="rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900 p-4">
             <div className="text-sm font-semibold mb-3">Review before creating in Meta</div>
-            <div className="flex flex-wrap gap-6 mb-4">
-              {squareImage && (
-                <div className="w-40 aspect-square rounded-lg overflow-hidden border border-black/10 dark:border-white/10">
-                  <img src={URL.createObjectURL(squareImage)} alt="Square preview" className="w-full h-full object-cover" />
-                </div>
-              )}
-              {verticalImage && (
-                <div className="w-32 aspect-[9/16] rounded-lg overflow-hidden border border-black/10 dark:border-white/10">
-                  <img src={URL.createObjectURL(verticalImage)} alt="Vertical preview" className="w-full h-full object-cover" />
-                </div>
-              )}
-              <div className="flex-1 min-w-[220px] rounded-lg border border-black/10 dark:border-white/10 p-3">
-                <div className="text-xs text-black/40 dark:text-white/40 mb-1">Juliano Pizzaria — Sponsored</div>
-                <div className="font-semibold text-sm">{headline}</div>
-                <div className="text-sm text-black/70 dark:text-white/70 mb-1">{primaryText}</div>
-                <div className="text-xs text-black/40 dark:text-white/40">{description}</div>
-                <div className="mt-2 inline-block text-xs font-medium bg-black/10 dark:bg-white/10 rounded px-2 py-1">{cta}</div>
-              </div>
-            </div>
             <div className="text-xs text-black/50 dark:text-white/50 mb-4 space-y-1">
               <div><span className="font-medium">Campaign:</span> {campaignName} ({OBJECTIVES.find((o) => o.value === objective)?.label})</div>
-              <div><span className="font-medium">Ad set:</span> {adSetName} — ${dailyBudget}/day</div>
-              <div><span className="font-medium">Audience:</span> {countries}, ages {ageMin}-{ageMax}, {gender}{interests ? `, interests: ${interests}` : ""}</div>
+              <div><span className="font-medium">Budget:</span> {budgetType} — ${budgetAmount} split across {adSets.length} ad set{adSets.length !== 1 ? "s" : ""}</div>
               <div><span className="font-medium">Link:</span> {linkUrl}</div>
             </div>
+            <div className="space-y-4">
+              {adSets.map((as) => (
+                <div key={as.id} className="rounded-lg border border-black/10 dark:border-white/10 p-3">
+                  <div className="text-sm font-semibold mb-1">{as.name}</div>
+                  <div className="text-xs text-black/50 dark:text-white/50 mb-2">
+                    {as.locationQuery ? `${as.locationQuery} (${as.radiusKm}km)` : as.countries}, ages {as.ageMin}-{as.ageMax}, {as.gender}
+                    {as.interests ? `, interests: ${as.interests}` : ""} — placements: {as.placementMode === "automatic" ? "automatic" : as.manualPlacements.join(", ") || "none selected"}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {as.ads.map((ad) => (
+                      <div key={ad.id} className="rounded-lg border border-black/10 dark:border-white/10 p-2.5">
+                        <div className="flex gap-2 mb-1">
+                          {ad.assets.slice(0, 3).map((a) => (
+                            <div key={a.id} className="w-10 h-10 rounded overflow-hidden bg-black/5 dark:bg-white/5 flex-shrink-0">
+                              {a.type === "image" ? (
+                                <img src={URL.createObjectURL(a.file)} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-[10px]">🎬</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="font-medium text-xs">{ad.headline || "(no headline)"}</div>
+                        <div className="text-xs text-black/60 dark:text-white/60">{ad.primaryText || "(no text)"}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
             {launchError && (
-              <div className="rounded-lg border border-red-500/30 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 text-sm p-3 mb-4">
-                {launchError}
-              </div>
+              <div className="mt-4 rounded-lg border border-red-500/30 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 text-sm p-3">{launchError}</div>
             )}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setPreviewing(false)}
-                className="rounded-lg border border-black/15 dark:border-white/15 text-sm px-4 py-2 hover:bg-black/5 dark:hover:bg-white/10"
-              >
-                Back to edit
-              </button>
-              <button
-                onClick={handleConfirmLaunch}
-                disabled={launching}
-                className="rounded-lg bg-blue-600 text-white text-sm font-medium px-4 py-2 hover:bg-blue-700 disabled:opacity-50"
-              >
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setPreviewing(false)} className="rounded-lg border border-black/15 dark:border-white/15 text-sm px-4 py-2 hover:bg-black/5 dark:hover:bg-white/10">Back to edit</button>
+              <button onClick={handleConfirmLaunch} disabled={launching} className="rounded-lg bg-blue-600 text-white text-sm font-medium px-4 py-2 hover:bg-blue-700 disabled:opacity-50">
                 {launching ? "Creating…" : "Create draft campaign (paused)"}
               </button>
             </div>
@@ -575,30 +682,24 @@ export default function CreativeFactory() {
             <div className="text-sm font-medium mb-1">
               Draft created — status: <span className="font-mono">{activated ? "ACTIVE" : launchResult.status}</span>
             </div>
-            <div className="text-xs text-black/50 dark:text-white/50 mb-3">
-              Campaign {launchResult.campaignId} · Ad set {launchResult.adSetId} · Ad {launchResult.adId}
+            <div className="text-xs text-black/50 dark:text-white/50 mb-3 space-y-0.5">
+              <div>Campaign {launchResult.campaignId}</div>
+              {launchResult.adSets.map((as) => (
+                <div key={as.adSetId}>
+                  Ad set {as.adSetName} ({as.adSetId}) — {as.ads.length} ad{as.ads.length !== 1 ? "s" : ""}
+                </div>
+              ))}
             </div>
             <div className="flex flex-wrap gap-2">
-              <a
-                href={launchResult.manageUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-lg border border-black/15 dark:border-white/15 text-sm px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/10"
-              >
+              <a href={launchResult.manageUrl} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-black/15 dark:border-white/15 text-sm px-3 py-1.5 hover:bg-black/5 dark:hover:bg-white/10">
                 Review in Meta Ads Manager
               </a>
               {!activated ? (
-                <button
-                  onClick={handleActivate}
-                  disabled={activating}
-                  className="rounded-lg bg-emerald-600 text-white text-sm font-medium px-3 py-1.5 hover:bg-emerald-700 disabled:opacity-50"
-                >
+                <button onClick={handleActivate} disabled={activating} className="rounded-lg bg-emerald-600 text-white text-sm font-medium px-3 py-1.5 hover:bg-emerald-700 disabled:opacity-50">
                   {activating ? "Activating…" : "Activate — start spending"}
                 </button>
               ) : (
-                <span className="text-sm text-emerald-700 dark:text-emerald-400 font-medium px-3 py-1.5">
-                  ✓ Activated — live on Meta
-                </span>
+                <span className="text-sm text-emerald-700 dark:text-emerald-400 font-medium px-3 py-1.5">✓ Activated — live on Meta</span>
               )}
               <button
                 onClick={() => {

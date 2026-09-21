@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { activateMetaAd } from "@/lib/creative/metaCampaign";
+import { activateCampaignTree, LaunchResult } from "@/lib/creative/metaCampaign";
 
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => null);
-  if (!body?.adId || !body?.adSetId) {
-    return NextResponse.json({ error: "adId and adSetId are required" }, { status: 400 });
+  const body = await req.json().catch(() => null) as LaunchResult | null;
+  if (!body?.campaignId || !Array.isArray(body.adSets)) {
+    return NextResponse.json({ error: "campaignId and adSets are required" }, { status: 400 });
   }
 
   try {
-    await activateMetaAd(body.adId, body.adSetId);
+    await activateCampaignTree(body);
     return NextResponse.json({ ok: true, status: "ACTIVE" });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
