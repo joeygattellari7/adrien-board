@@ -45,7 +45,10 @@ const GOOGLE_CAMPAIGN_TYPES: { value: GoogleCampaignType; label: string; helper:
   { value: "SEARCH", label: "Search", helper: "Text ads on Google Search, built from keywords." },
   { value: "DISPLAY", label: "Display", helper: "Image-based ads across the Google Display Network." },
   { value: "PERFORMANCE_MAX", label: "Performance Max", helper: "One campaign, automatically placed across Search, Display, YouTube, Gmail and Maps." },
+  { value: "VIDEO", label: "Video", helper: "In-stream ads on YouTube, built from an existing YouTube video." },
 ];
+
+const GOOGLE_CTA_OPTIONS = ["Learn More", "Shop Now", "Sign Up", "Order Now", "Get Quote", "Subscribe", "Visit Site", "Watch Now"];
 
 let idCounter = 0;
 function newId() {
@@ -53,7 +56,15 @@ function newId() {
   return `id-${idCounter}`;
 }
 
-type LocalAsset = { id: string; file: File; type: "image" | "video"; format: "1:1" | "9:16" };
+type LocalAsset = {
+  id: string;
+  file: File;
+  type: "image" | "video";
+  format: "1:1" | "9:16";
+  cardHeadline: string;
+  cardDescription: string;
+  cardLink: string;
+};
 type LocalAd = {
   id: string;
   name: string;
@@ -61,6 +72,7 @@ type LocalAd = {
   primaryText: string;
   description: string;
   cta: string;
+  format: "auto" | "carousel";
   assets: LocalAsset[];
 };
 type LocalAdSet = {
@@ -75,6 +87,8 @@ type LocalAdSet = {
   interests: string;
   placementMode: PlacementMode;
   manualPlacements: PlacementOption[];
+  startTime: string;
+  endTime: string;
   ads: LocalAd[];
 };
 
@@ -86,6 +100,7 @@ function newAd(defaults?: Partial<LocalAd>): LocalAd {
     primaryText: "",
     description: "",
     cta: "Order Now",
+    format: "auto",
     assets: [],
     ...defaults,
   };
@@ -104,6 +119,8 @@ function newAdSet(index: number): LocalAdSet {
     interests: "",
     placementMode: "automatic",
     manualPlacements: [],
+    startTime: "",
+    endTime: "",
     ads: [newAd()],
   };
 }
@@ -117,9 +134,17 @@ async function fileToBase64(file: File): Promise<string> {
   });
 }
 
-function AssetUploader({ assets, onChange }: { assets: LocalAsset[]; onChange: (assets: LocalAsset[]) => void }) {
+function AssetUploader({
+  assets,
+  onChange,
+  carousel,
+}: {
+  assets: LocalAsset[];
+  onChange: (assets: LocalAsset[]) => void;
+  carousel?: boolean;
+}) {
   function addFile(file: File, type: "image" | "video", format: "1:1" | "9:16") {
-    onChange([...assets, { id: newId(), file, type, format }]);
+    onChange([...assets, { id: newId(), file, type, format, cardHeadline: "", cardDescription: "", cardLink: "" }]);
   }
   function remove(id: string) {
     onChange(assets.filter((a) => a.id !== id));
@@ -164,20 +189,44 @@ function AssetUploader({ assets, onChange }: { assets: LocalAsset[]; onChange: (
         <span className="text-[10px] text-black/40 dark:text-white/40">Add image or video, then set its format below</span>
       </div>
       {assets.length > 0 && (
-        <div className="mt-2 space-y-1">
+        <div className="mt-2 space-y-1.5">
           {assets.map((a) => (
-            <div key={a.id} className="flex items-center gap-2 text-xs">
-              <span className="text-black/50 dark:text-white/50 truncate max-w-[120px]">{a.file.name}</span>
-              <select
-                value={a.format}
-                onChange={(e) =>
-                  onChange(assets.map((x) => (x.id === a.id ? { ...x, format: e.target.value as "1:1" | "9:16" } : x)))
-                }
-                className="rounded border border-black/15 dark:border-white/15 bg-transparent px-1.5 py-0.5 text-xs"
-              >
-                <option value="1:1">1:1 Square</option>
-                <option value="9:16">9:16 Vertical</option>
-              </select>
+            <div key={a.id} className="text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-black/50 dark:text-white/50 truncate max-w-[120px]">{a.file.name}</span>
+                <select
+                  value={a.format}
+                  onChange={(e) =>
+                    onChange(assets.map((x) => (x.id === a.id ? { ...x, format: e.target.value as "1:1" | "9:16" } : x)))
+                  }
+                  className="rounded border border-black/15 dark:border-white/15 bg-transparent px-1.5 py-0.5 text-xs"
+                >
+                  <option value="1:1">1:1 Square</option>
+                  <option value="9:16">9:16 Vertical</option>
+                </select>
+              </div>
+              {carousel && (
+                <div className="grid grid-cols-3 gap-1 mt-1 pl-1">
+                  <input
+                    value={a.cardHeadline}
+                    onChange={(e) => onChange(assets.map((x) => (x.id === a.id ? { ...x, cardHeadline: e.target.value } : x)))}
+                    placeholder="Card headline (optional)"
+                    className="rounded border border-black/15 dark:border-white/15 bg-transparent px-1.5 py-1 text-[11px]"
+                  />
+                  <input
+                    value={a.cardDescription}
+                    onChange={(e) => onChange(assets.map((x) => (x.id === a.id ? { ...x, cardDescription: e.target.value } : x)))}
+                    placeholder="Card description (optional)"
+                    className="rounded border border-black/15 dark:border-white/15 bg-transparent px-1.5 py-1 text-[11px]"
+                  />
+                  <input
+                    value={a.cardLink}
+                    onChange={(e) => onChange(assets.map((x) => (x.id === a.id ? { ...x, cardLink: e.target.value } : x)))}
+                    placeholder="Card link (optional)"
+                    className="rounded border border-black/15 dark:border-white/15 bg-transparent px-1.5 py-1 text-[11px]"
+                  />
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -287,6 +336,7 @@ export default function CreativeFactory() {
   const [objective, setObjective] = useState<MetaObjective>("OUTCOME_TRAFFIC");
   const [budgetType, setBudgetType] = useState<BudgetType>("daily");
   const [budgetAmount, setBudgetAmount] = useState("20");
+  const [campaignBudgetOptimization, setCampaignBudgetOptimization] = useState(true);
   const [linkUrl, setLinkUrl] = useState("");
   const [pixelId, setPixelId] = useState("");
   const [conversionEvent, setConversionEvent] = useState("PURCHASE");
@@ -386,6 +436,8 @@ export default function CreativeFactory() {
           interests: as.interests || undefined,
           placementMode: as.placementMode,
           manualPlacements: as.placementMode === "manual" ? as.manualPlacements : undefined,
+          startTime: as.startTime ? new Date(as.startTime).toISOString() : undefined,
+          endTime: as.endTime ? new Date(as.endTime).toISOString() : undefined,
           ads: await Promise.all(
             as.ads.map(async (ad) => ({
               name: ad.name,
@@ -393,11 +445,15 @@ export default function CreativeFactory() {
               primaryText: ad.primaryText,
               description: ad.description,
               cta: ad.cta,
+              format: ad.format,
               assets: await Promise.all(
                 ad.assets.map(async (asset) => ({
                   base64: await fileToBase64(asset.file),
                   type: asset.type,
                   format: asset.format,
+                  cardHeadline: asset.cardHeadline || undefined,
+                  cardDescription: asset.cardDescription || undefined,
+                  cardLink: asset.cardLink || undefined,
                 }))
               ),
             }))
@@ -413,6 +469,7 @@ export default function CreativeFactory() {
           objective,
           budgetType,
           budgetAmount: Number(budgetAmount),
+          campaignBudgetOptimization,
           linkUrl,
           pixelId: objective === "OUTCOME_SALES" ? pixelId : undefined,
           conversionEvent: objective === "OUTCOME_SALES" ? conversionEvent : undefined,
@@ -719,13 +776,30 @@ export default function CreativeFactory() {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-black/50 dark:text-white/50">
-                    {budgetType === "daily" ? "Daily" : "Lifetime"} budget (AUD, split evenly across ad sets)
+                    {budgetType === "daily" ? "Daily" : "Lifetime"} budget (AUD{!campaignBudgetOptimization ? ", split evenly across ad sets" : ""})
                   </label>
                   <input type="number" min={2} value={budgetAmount} onChange={(e) => setBudgetAmount(e.target.value)} required className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm" />
                 </div>
                 <div className="md:col-span-2">
                   <label className="text-xs font-medium text-black/50 dark:text-white/50">Link URL</label>
                   <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} required placeholder="https://julianopizzaria.bitebusiness.com/" className="w-full mt-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm" />
+                </div>
+                <div className="md:col-span-2 flex items-start gap-2 rounded-lg border border-black/10 dark:border-white/10 p-3">
+                  <input
+                    type="checkbox"
+                    id="cbo"
+                    checked={campaignBudgetOptimization}
+                    onChange={(e) => setCampaignBudgetOptimization(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor="cbo" className="text-xs">
+                    <span className="font-medium">Advantage+ campaign budget</span>
+                    <span className="block text-black/50 dark:text-white/50">
+                      {campaignBudgetOptimization
+                        ? "Meta sets the budget at the campaign level and distributes it across ad sets automatically."
+                        : "Budget is set manually and split evenly across ad sets — turn this off to control each ad set's spend yourself."}
+                    </span>
+                  </label>
                 </div>
               </div>
               {objective === "OUTCOME_SALES" && (

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { launchGoogleCampaignTree, GoogleCampaignType } from "@/lib/creative/googleCampaign";
 
-const VALID_TYPES: GoogleCampaignType[] = ["SEARCH", "DISPLAY", "PERFORMANCE_MAX"];
+const VALID_TYPES: GoogleCampaignType[] = ["SEARCH", "DISPLAY", "PERFORMANCE_MAX", "VIDEO"];
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -20,13 +20,17 @@ export async function POST(req: NextRequest) {
   }
   for (const [i, ag] of body.adGroups.entries()) {
     if (!ag.name) return NextResponse.json({ error: `Ad group ${i + 1} needs a name` }, { status: 400 });
+    if (body.campaignType === "VIDEO") {
+      if (!ag.videoId) return NextResponse.json({ error: `Ad group "${ag.name}" needs a YouTube video` }, { status: 400 });
+      continue;
+    }
     if (body.campaignType === "SEARCH" && (!Array.isArray(ag.headlines) || ag.headlines.length < 3)) {
       return NextResponse.json({ error: `Ad group "${ag.name}" needs at least 3 headlines` }, { status: 400 });
     }
     if (!Array.isArray(ag.descriptions) || ag.descriptions.length < 2) {
       return NextResponse.json({ error: `Ad group "${ag.name}" needs at least 2 descriptions` }, { status: 400 });
     }
-    if (body.campaignType !== "SEARCH" && (!Array.isArray(ag.images) || ag.images.length === 0)) {
+    if ((body.campaignType === "DISPLAY" || body.campaignType === "PERFORMANCE_MAX") && (!Array.isArray(ag.images) || ag.images.length === 0)) {
       return NextResponse.json({ error: `Ad group "${ag.name}" needs at least one image for ${body.campaignType} campaigns` }, { status: 400 });
     }
   }
@@ -43,7 +47,10 @@ export async function POST(req: NextRequest) {
         headlines: Array.isArray(ag.headlines) ? ag.headlines : [],
         descriptions: Array.isArray(ag.descriptions) ? ag.descriptions : [],
         images: Array.isArray(ag.images) ? ag.images : [],
+        videoId: typeof ag.videoId === "string" ? ag.videoId : undefined,
+        callToAction: typeof ag.callToAction === "string" ? ag.callToAction : undefined,
       })),
+      assets: body.assets && typeof body.assets === "object" ? body.assets : undefined,
     });
     return NextResponse.json({ ok: true, ...result, status: "PAUSED" });
   } catch (e) {

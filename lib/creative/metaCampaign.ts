@@ -165,7 +165,14 @@ export type AdAssetInput = {
   base64: string;
   type: "image" | "video";
   format: "1:1" | "9:16";
+  // Per-card overrides, used only when the ad's format is "carousel" — each
+  // asset becomes its own carousel card with its own headline/description/link.
+  cardHeadline?: string;
+  cardDescription?: string;
+  cardLink?: string;
 };
+
+export type AdFormat = "auto" | "carousel";
 
 export type AdInput = {
   name: string;
@@ -173,6 +180,7 @@ export type AdInput = {
   primaryText: string;
   description: string;
   cta: string;
+  format?: AdFormat; // "carousel" requires 2+ image assets; otherwise falls back to single/asset_feed_spec
   assets: AdAssetInput[];
 };
 
@@ -187,6 +195,8 @@ export type AdSetInput = {
   interests?: string; // free-text, comma-separated — resolved to interest IDs
   placementMode: PlacementMode;
   manualPlacements?: PlacementOption[];
+  startTime?: string; // ISO datetime — ad set schedule start, defaults to "now" if omitted
+  endTime?: string; // ISO datetime — ad set schedule end, only required for lifetime budgets
   ads: AdInput[];
 };
 
@@ -195,6 +205,7 @@ export type CampaignInput = {
   objective: MetaObjective;
   budgetType: BudgetType;
   budgetAmount: number; // dollars
+  campaignBudgetOptimization: boolean; // Meta's "Advantage+ campaign budget" — budget lives on the campaign, not each ad set
   linkUrl: string;
   pixelId?: string;
   conversionEvent?: string;
@@ -393,7 +404,27 @@ async function createCreativeForAd(
 
   let creativeBody: Record<string, unknown>;
 
-  if (video) {
+  if (ad.format === "carousel" && images.length >= 2) {
+    const hashes = await Promise.all(images.map((img) => uploadImage(act, token, img.base64)));
+    const childAttachments = images.map((img, i) => ({
+      link: img.cardLink || linkUrl,
+      name: img.cardHeadline || ad.headline,
+      description: img.cardDescription || ad.description,
+      image_hash: hashes[i],
+    }));
+    creativeBody = {
+      name: `${ad.name} - Creative`,
+      object_story_spec: {
+        page_id: pageId,
+        link_data: {
+          link: linkUrl,
+          message: ad.primaryText,
+          call_to_action: { type: ctaType },
+          child_attachments: childAttachments,
+        },
+      },
+    };
+  } else if (video) {
     // Video ads use a single video via video_data — mixing multiple videos
     // or video+image in one ad isn't supported here; the first video wins.
     const { videoId, thumbnailUrl } = await uploadVideo(act, token, video.base64);
@@ -471,12 +502,22 @@ export async function launchCampaignTree(input: CampaignInput): Promise<LaunchRe
 
   const act = `act_${accountId}`;
 
-  const campaign = await graphPost(`/${act}/campaigns`, token!, {
+  const campaignBody: Record<string, unknown> = {
     name: input.campaignName,
     objective: input.objective,
     status: "PAUSED",
     special_ad_categories: [],
-  });
+  };
+  if (input.campaignBudgetOptimization) {
+    if (input.budgetType === "daily") {
+      campaignBody.daily_budget = Math.round(input.budgetAmount * 100);
+    } else {
+      campaignBody.lifetime_budget = Math.round(input.budgetAmount * 100);
+    }
+    campaignBody.bid_strategy = "LOWEST_COST_WITHOUT_CAP";
+  }
+
+  const campaign = await graphPost(`/${act}/campaigns`, token!, campaignBody);
   const campaignId = campaign.id as string;
 
   const adSetResults: LaunchResult["adSets"] = [];
@@ -489,15 +530,20 @@ export async function launchCampaignTree(input: CampaignInput): Promise<LaunchRe
       campaign_id: campaignId,
       billing_event: "IMPRESSIONS",
       optimization_goal: OPTIMIZATION_GOAL[input.objective],
-      bid_strategy: "LOWEST_COST_WITHOUT_CAP",
       targeting,
       status: "PAUSED",
     };
-    if (input.budgetType === "daily") {
-      adSetBody.daily_budget = Math.round((input.budgetAmount * 100) / input.adSets.length);
-    } else {
-      adSetBody.lifetime_budget = Math.round((input.budgetAmount * 100) / input.adSets.length);
-      adSetBody.end_time = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    if (adSetInput.startTime) adSetBody.start_time = adSetInput.startTime;
+    if (!input.campaignBudgetOptimization) {
+      adSetBody.bid_strategy = "LOWEST_COST_WITHOUT_CAP";
+      if (input.budgetType === "daily") {
+        adSetBody.daily_budget = Math.round((input.budgetAmount * 100) / input.adSets.length);
+      } else {
+        adSetBody.lifetime_budget = Math.round((input.budgetAmount * 100) / input.adSets.length);
+        adSetBody.end_time = adSetInput.endTime || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      }
+    } else if (adSetInput.endTime) {
+      adSetBody.end_time = adSetInput.endTime;
     }
     if (input.objective === "OUTCOME_SALES") {
       adSetBody.promoted_object = { pixel_id: input.pixelId, custom_event_type: input.conversionEvent };

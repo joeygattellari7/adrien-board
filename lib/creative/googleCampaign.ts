@@ -1,18 +1,32 @@
 const API_VERSION = "v23";
 
-export type GoogleCampaignType = "SEARCH" | "DISPLAY" | "PERFORMANCE_MAX";
+export type GoogleCampaignType = "SEARCH" | "DISPLAY" | "PERFORMANCE_MAX" | "VIDEO";
 
 export type GoogleMatchType = "BROAD" | "PHRASE" | "EXACT";
 export type GoogleKeyword = { text: string; matchType: GoogleMatchType };
 
 export type GoogleImageAssetInput = { base64: string };
 
+export type GoogleSitelink = { text: string; description1?: string; description2?: string; finalUrl: string };
+export type GoogleStructuredSnippet = { header: string; values: string[] };
+
+// Campaign-level "Assets" (Google's current name for what used to be called
+// ad extensions) — sitelinks, callouts, and structured snippets all attach
+// to the whole campaign and can show under any ad in it.
+export type GoogleCampaignAssets = {
+  sitelinks?: GoogleSitelink[];
+  callouts?: string[];
+  structuredSnippets?: GoogleStructuredSnippet[];
+};
+
 export type GoogleAdGroupInput = {
   name: string;
-  keywords: GoogleKeyword[]; // ignored for DISPLAY / PERFORMANCE_MAX
-  headlines: string[]; // <=30 chars each; Search needs >=3, Display/PMax want more
+  keywords: GoogleKeyword[]; // Search only
+  headlines: string[]; // <=30 chars each; Search/Display/PMax need >=3
   descriptions: string[]; // <=90 chars each; needs >=2
-  images?: GoogleImageAssetInput[]; // used for DISPLAY / PERFORMANCE_MAX
+  images?: GoogleImageAssetInput[]; // Display / Performance Max
+  videoId?: string; // YouTube video ID (or full URL — parsed) — Video campaigns only
+  callToAction?: string; // Video campaigns only, e.g. "Learn More", "Shop Now"
 };
 
 export type GoogleCampaignInput = {
@@ -21,6 +35,7 @@ export type GoogleCampaignInput = {
   dailyBudget: number; // dollars
   finalUrl: string;
   adGroups: GoogleAdGroupInput[];
+  assets?: GoogleCampaignAssets;
 };
 
 export type GoogleLaunchResult = {
@@ -129,6 +144,57 @@ async function uploadTextAsset(auth: Auth, text: string): Promise<string> {
   return res.results[0].resourceName;
 }
 
+function extractYoutubeId(input: string): string {
+  const match = input.match(/(?:youtu\.be\/|v=|\/shorts\/)([A-Za-z0-9_-]{6,})/);
+  return match ? match[1] : input.trim();
+}
+
+async function uploadYoutubeVideoAsset(auth: Auth, videoIdOrUrl: string): Promise<string> {
+  const youtubeVideoId = extractYoutubeId(videoIdOrUrl);
+  const res = await mutate("assets", auth, [{ create: { type: "YOUTUBE_VIDEO", youtubeVideoAsset: { youtubeVideoId } } }]);
+  return res.results[0].resourceName;
+}
+
+/**
+ * Links campaign-level "Assets" (Google's current name for sitelinks,
+ * callouts, and structured snippets — what used to be called ad
+ * extensions). These attach to the whole campaign and can surface under any
+ * ad group's ads within it.
+ */
+async function buildCampaignAssets(auth: Auth, campaignResourceName: string, assets: GoogleCampaignAssets): Promise<void> {
+  const ops: Record<string, unknown>[] = [];
+
+  for (const sitelink of assets.sitelinks ?? []) {
+    const assetRes = await mutate("assets", auth, [
+      {
+        create: {
+          finalUrls: [sitelink.finalUrl],
+          sitelinkAsset: {
+            linkText: sitelink.text,
+            description1: sitelink.description1 || undefined,
+            description2: sitelink.description2 || undefined,
+          },
+        },
+      },
+    ]);
+    ops.push({ create: { campaign: campaignResourceName, asset: assetRes.results[0].resourceName, fieldType: "SITELINK" } });
+  }
+
+  for (const callout of assets.callouts ?? []) {
+    const assetRes = await mutate("assets", auth, [{ create: { calloutAsset: { calloutText: callout } } }]);
+    ops.push({ create: { campaign: campaignResourceName, asset: assetRes.results[0].resourceName, fieldType: "CALLOUT" } });
+  }
+
+  for (const snippet of assets.structuredSnippets ?? []) {
+    const assetRes = await mutate("assets", auth, [
+      { create: { structuredSnippetAsset: { header: snippet.header, values: snippet.values } } },
+    ]);
+    ops.push({ create: { campaign: campaignResourceName, asset: assetRes.results[0].resourceName, fieldType: "STRUCTURED_SNIPPET" } });
+  }
+
+  if (ops.length > 0) await mutate("campaignAssets", auth, ops);
+}
+
 /**
  * Performance Max campaigns are asset-group based rather than
  * ad-group-based: text and image assets are uploaded individually, then
@@ -184,11 +250,15 @@ async function buildPerformanceMaxAssetGroup(
 export async function launchGoogleCampaignTree(input: GoogleCampaignInput): Promise<GoogleLaunchResult> {
   if (input.adGroups.length === 0) throw new Error("At least one ad group is required");
   for (const ag of input.adGroups) {
+    if (input.campaignType === "VIDEO") {
+      if (!ag.videoId) throw new Error(`Ad group "${ag.name}" needs a YouTube video`);
+      continue;
+    }
     if (input.campaignType === "SEARCH" && ag.headlines.length < 3) {
       throw new Error(`Ad group "${ag.name}" needs at least 3 headlines`);
     }
     if (ag.descriptions.length < 2) throw new Error(`Ad group "${ag.name}" needs at least 2 descriptions`);
-    if (input.campaignType !== "SEARCH" && (!ag.images || ag.images.length === 0)) {
+    if ((input.campaignType === "DISPLAY" || input.campaignType === "PERFORMANCE_MAX") && (!ag.images || ag.images.length === 0)) {
       throw new Error(`Ad group "${ag.name}" needs at least one image for ${input.campaignType} campaigns`);
     }
   }
@@ -222,6 +292,8 @@ export async function launchGoogleCampaignTree(input: GoogleCampaignInput): Prom
     campaignBody.manualCpc = {};
   } else if (input.campaignType === "DISPLAY") {
     campaignBody.maximizeConversions = {};
+  } else if (input.campaignType === "VIDEO") {
+    campaignBody.manualCpv = {};
   } else {
     campaignBody.maximizeConversionValue = {};
     campaignBody.urlExpansionOptOut = false;
@@ -230,6 +302,8 @@ export async function launchGoogleCampaignTree(input: GoogleCampaignInput): Prom
   const campaignRes = await mutate("campaigns", auth, [{ create: campaignBody }]);
   const campaignResourceName = campaignRes.results[0].resourceName;
   const campaignId = campaignResourceName.split("/").pop()!;
+
+  if (input.assets) await buildCampaignAssets(auth, campaignResourceName, input.assets);
 
   const adGroupResults: GoogleLaunchResult["adGroups"] = [];
 
@@ -244,14 +318,16 @@ export async function launchGoogleCampaignTree(input: GoogleCampaignInput): Prom
     }
   } else {
     for (const ag of input.adGroups) {
+      const adGroupType =
+        input.campaignType === "SEARCH" ? "SEARCH_STANDARD" : input.campaignType === "VIDEO" ? "VIDEO_TRUE_VIEW_IN_STREAM" : "DISPLAY_STANDARD";
       const adGroupRes = await mutate("adGroups", auth, [
         {
           create: {
             name: ag.name,
             campaign: campaignResourceName,
             status: "ENABLED",
-            type: input.campaignType === "SEARCH" ? "SEARCH_STANDARD" : "DISPLAY_STANDARD",
-            cpcBidMicros: "1000000",
+            type: adGroupType,
+            cpcBidMicros: input.campaignType === "VIDEO" ? undefined : "1000000",
           },
         },
       ]);
@@ -268,7 +344,27 @@ export async function launchGoogleCampaignTree(input: GoogleCampaignInput): Prom
       }
 
       let adRes;
-      if (input.campaignType === "SEARCH") {
+      if (input.campaignType === "VIDEO") {
+        const videoResourceName = await uploadYoutubeVideoAsset(auth, ag.videoId!);
+        adRes = await mutate("adGroupAds", auth, [
+          {
+            create: {
+              adGroup: adGroupResourceName,
+              status: "PAUSED",
+              ad: {
+                finalUrls: [input.finalUrl],
+                videoResponsiveAd: {
+                  headlines: ag.headlines.filter(Boolean).map((h) => ({ text: h })),
+                  longHeadlines: ag.headlines[0] ? [{ text: ag.headlines[0] }] : [],
+                  descriptions: ag.descriptions.filter(Boolean).map((d) => ({ text: d })),
+                  callToActions: [{ text: ag.callToAction || "Learn More" }],
+                  videos: [{ asset: videoResourceName }],
+                },
+              },
+            },
+          },
+        ]);
+      } else if (input.campaignType === "SEARCH") {
         adRes = await mutate("adGroupAds", auth, [
           {
             create: {
