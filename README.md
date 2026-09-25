@@ -201,9 +201,13 @@ scratch) across every social platform and queueing it to go out:
   Marketplace) for persistence. Without it, the queue falls back to
   in-memory storage that doesn't survive a restart or cold start — fine for
   trying it out, not for production use.
-- **Vercel Cron note**: the Hobby plan only allows daily cron runs; the
-  5-minute schedule in `vercel.json` needs a Pro plan (or the interval
-  changed to `0 * * * *`/daily) to actually fire that often.
+- **Vercel Cron note**: the Hobby plan only allows daily cron runs, so
+  `vercel.json` schedules `/api/content/publish-due` once a day (9am UTC).
+  A more frequent check (every 5–15 min, so scheduled posts go out closer to
+  their target time) needs a Pro plan — tighten the schedule there once
+  you're on one. A 5-minute schedule on Hobby isn't just throttled, it
+  **blocks every deployment outright** (Vercel rejects the whole build at
+  validation), so don't loosen this without upgrading first.
 
 ## Deploy on Vercel
 
