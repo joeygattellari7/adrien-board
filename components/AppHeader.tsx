@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 const TABS = [
   { href: "/", label: "Dashboard" },
   { href: "/creative-factory", label: "Creative Factory" },
+  { href: "/content-studio", label: "Content Studio" },
+  { href: "/scheduler", label: "Scheduler" },
 ];
 
 const HERO_COPY: Record<string, { eyebrow: string; heading: [string, string]; body: string }> = {
@@ -18,6 +20,16 @@ const HERO_COPY: Record<string, { eyebrow: string; heading: [string, string]; bo
     eyebrow: "Creative Factory",
     heading: ["Idea to launch.", "In minutes."],
     body: "AI-written copy, full campaign builds for Meta and Google — always paused until you say go.",
+  },
+  "/content-studio": {
+    eyebrow: "Content Studio",
+    heading: ["One upload.", "Every platform."],
+    body: "Repurpose a photo or video — or start from nothing — into captions and crops built for Meta, YouTube, LinkedIn, TikTok, and X.",
+  },
+  "/scheduler": {
+    eyebrow: "Scheduler",
+    heading: ["Queue it.", "Forget it."],
+    body: "Everything you've scheduled, across every platform, in one queue — Meta posts itself, the rest remind you.",
   },
 };
 

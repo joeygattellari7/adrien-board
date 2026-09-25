@@ -164,6 +164,47 @@ read-only reporting integration above — no extra setup needed as long as the
 OAuth token was authorized with the `https://www.googleapis.com/auth/adwords`
 scope (which grants both read and write).
 
+## Content Studio & Scheduler
+
+Two more tabs, for repurposing existing photos/video (or generating from
+scratch) across every social platform and queueing it to go out:
+
+1. **Content Studio** (`/api/content/repurpose`) — upload a photo or video,
+   or leave it blank, pick platforms (Meta, YouTube, LinkedIn, TikTok,
+   Twitter/X), and it generates a tailored caption + hashtags per platform
+   (Anthropic API, template fallback) plus a center-cropped image resized to
+   each platform's native aspect ratio (via `sharp`).
+   - **Video is not resized.** Transcoding video per platform (aspect ratio,
+     length limits) needs a real media pipeline — ffmpeg in a serverless
+     function is fragile (execution time limits, no persistent disk) and
+     wasn't something to ship untested. Video posts carry the original file
+     through as-is, with a note showing the target spec for each platform.
+2. **Scheduler** (`/api/content/schedule`, `/api/content/publish-due`) — a
+   queue of everything scheduled from Content Studio. A Vercel Cron job
+   (`vercel.json`, every 5 minutes) hits `/api/content/publish-due`:
+   - **Meta** posts automatically via the Facebook Page's `/photos` or
+     `/feed` endpoint (an organic post, separate from the paid ad campaigns
+     above) when a post comes due.
+   - **YouTube, LinkedIn, TikTok, Twitter/X** don't have posting APIs wired
+     up yet — each needs its own developer app, OAuth consent, and (for
+     TikTok in particular) a manual approval process. Due posts on these
+     platforms flip to "needs manual post" in the Scheduler so nothing
+     silently fails to go out — you post it yourself and click "Mark
+     posted."
+
+**Setup**:
+- Meta auto-posting needs `META_ACCESS_TOKEN` with **`pages_manage_posts`**
+  permission (a third scope, distinct from `ads_read` and `ads_management`)
+  plus the existing `META_PAGE_ID`.
+- The scheduler queue needs `UPSTASH_REDIS_REST_URL` and
+  `UPSTASH_REDIS_REST_TOKEN` (add a Redis integration from the Vercel
+  Marketplace) for persistence. Without it, the queue falls back to
+  in-memory storage that doesn't survive a restart or cold start — fine for
+  trying it out, not for production use.
+- **Vercel Cron note**: the Hobby plan only allows daily cron runs; the
+  5-minute schedule in `vercel.json` needs a Pro plan (or the interval
+  changed to `0 * * * *`/daily) to actually fire that often.
+
 ## Deploy on Vercel
 
 Import this repository in [Vercel](https://vercel.com/new), point it at the
