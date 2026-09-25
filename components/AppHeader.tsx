@@ -12,7 +12,7 @@ const TABS = [
 
 const HERO_COPY: Record<string, { eyebrow: string; heading: [string, string]; body: string }> = {
   "/": {
-    eyebrow: "Juliano Pizzaria",
+    eyebrow: "Dashboard",
     heading: ["Every channel.", "One view."],
     body: "Sales, ads, and social — pulled live from Meta, Google, and Bite, in one place, updated in real time.",
   },
@@ -74,9 +74,6 @@ export default function AppHeader() {
                 </Link>
               );
             })}
-            <span className="ml-2 mr-1 rounded-full bg-white text-black text-xs font-semibold px-3.5 py-1.5">
-              Juliano Pizzaria
-            </span>
           </nav>
         </div>
 
