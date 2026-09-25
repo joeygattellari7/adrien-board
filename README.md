@@ -214,6 +214,34 @@ scratch) across every social platform and queueing it to go out:
   **blocks every deployment outright** (Vercel rejects the whole build at
   validation), so don't loosen this without upgrading first.
 
+## Adrien Brain
+
+The orchestration layer on top of Content Studio and the Scheduler — the
+goal is simple: **never let a platform go more than a day without a post,
+two at the absolute most.**
+
+- **Content library** (`/api/content/library`) — a standing folder of
+  photos to repurpose, separate from any one Content Studio session. Add to
+  it any time; each asset tracks how many times it's been used so Adrien
+  Brain favors whatever's been sitting the longest.
+- **Brand brief** (`/api/content/brand`) — a saved default
+  product/offer/tone/details brief, so Adrien Brain doesn't need you to
+  retype one every time it proposes something on its own.
+- **The plan** (`/api/content/plan`) — on load, checks every platform's most
+  recent scheduled/published/manual-post entry in the Scheduler. Any
+  platform within 4 hours of the 24h mark shows as "Due soon"; past 48h
+  shows as "Overdue." For each, it proposes a time, a caption (generated
+  from the brand brief), and either the least-recently-used library asset
+  ("repurpose") or a "Generate an image" button when the library's empty or
+  exhausted. One click — "Approve & schedule" — sends it straight into the
+  same Scheduler queue everything else uses.
+- **Video** isn't stored in the library or generated here, for the same
+  reason as everywhere else in Content Studio — no media pipeline for it
+  yet. The library is images only for now.
+
+This reuses the Scheduler's Redis/in-memory backend and Content Studio's
+image generation — no new env vars beyond what those already need.
+
 ## Deploy on Vercel
 
 Import this repository in [Vercel](https://vercel.com/new), point it at the

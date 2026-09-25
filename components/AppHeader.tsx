@@ -7,6 +7,7 @@ const TABS = [
   { href: "/", label: "Dashboard" },
   { href: "/creative-factory", label: "Creative Factory" },
   { href: "/content-studio", label: "Content Studio" },
+  { href: "/adrien-brain", label: "Adrien Brain" },
   { href: "/scheduler", label: "Scheduler" },
 ];
 
@@ -25,6 +26,11 @@ const HERO_COPY: Record<string, { eyebrow: string; heading: [string, string]; bo
     eyebrow: "Content Studio",
     heading: ["One upload.", "Every platform."],
     body: "Repurpose a photo or video — or start from nothing — into captions and crops built for Meta, YouTube, LinkedIn, TikTok, and X.",
+  },
+  "/adrien-brain": {
+    eyebrow: "Adrien Brain",
+    heading: ["Never miss", "a day."],
+    body: "One day without posting, two at the absolute most. Adrien Brain watches every platform and proposes what to post before that ever happens.",
   },
   "/scheduler": {
     eyebrow: "Scheduler",
