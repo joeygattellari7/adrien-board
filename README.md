@@ -170,18 +170,23 @@ Two more tabs, for repurposing existing photos/video (or generating from
 scratch) across every social platform and queueing it to go out:
 
 1. **Content Studio** (`/api/content/repurpose`) — upload a photo or video,
-   or leave it blank, pick platforms (Meta, YouTube, LinkedIn, TikTok,
-   Twitter/X), and it generates a tailored caption + hashtags per platform
-   (Anthropic API, template fallback) plus a center-cropped image resized to
-   each platform's native aspect ratio (via `sharp`).
-   - **Video is not resized.** Transcoding video per platform (aspect ratio,
-     length limits) needs a real media pipeline — ffmpeg in a serverless
-     function is fragile (execution time limits, no persistent disk) and
-     wasn't something to ship untested. Video posts carry the original file
-     through as-is, with a note showing the target spec for each platform.
+   generate one with AI (`/api/content/generate-image` — OpenAI's image API,
+   from the same product/offer/tone/details brief as the copy generators),
+   or leave it blank entirely, pick platforms (Meta, YouTube, LinkedIn,
+   TikTok, Twitter/X), and it generates a tailored caption + hashtags per
+   platform (Anthropic API, template fallback) plus a center-cropped image
+   resized to each platform's native aspect ratio (via `sharp`).
+   - **Video is not resized or generated.** Transcoding video per platform
+     (aspect ratio, length limits) needs a real media pipeline — ffmpeg in a
+     serverless function is fragile (execution time limits, no persistent
+     disk) and wasn't something to ship untested. Video posts carry the
+     original file through as-is, with a note showing the target spec for
+     each platform. AI video generation (Runway/Luma/Veo/Kling) is a
+     separate paid API each, not yet wired up — a further fast-follow once
+     one's chosen.
 2. **Scheduler** (`/api/content/schedule`, `/api/content/publish-due`) — a
    queue of everything scheduled from Content Studio. A Vercel Cron job
-   (`vercel.json`, every 5 minutes) hits `/api/content/publish-due`:
+   (`vercel.json`, daily — see the Cron note below) hits `/api/content/publish-due`:
    - **Meta** posts automatically via the Facebook Page's `/photos` or
      `/feed` endpoint (an organic post, separate from the paid ad campaigns
      above) when a post comes due.

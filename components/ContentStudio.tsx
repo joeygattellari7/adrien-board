@@ -26,7 +26,7 @@ function ScheduleRow({ result, originalFile }: { result: ResultRow; originalFile
   const [caption, setCaption] = useState(result.caption);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState<string | null>(null);
-  const mediaType = originalFile ? (originalFile.type.startsWith("video/") ? "video" : "image") : undefined;
+  const mediaType = originalFile ? (originalFile.type.startsWith("video/") ? "video" : "image") : result.resizedImageBase64 ? "image" : undefined;
 
   async function schedule() {
     if (!when) return;
@@ -102,6 +102,9 @@ export default function ContentStudio() {
   const [tone, setTone] = useState("");
   const [details, setDetails] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [generatedImageBase64, setGeneratedImageBase64] = useState<string | null>(null);
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const [generateImageError, setGenerateImageError] = useState<string | null>(null);
   const [platforms, setPlatforms] = useState<ContentPlatform[]>(ALL_PLATFORMS);
   const [generating, setGenerating] = useState(false);
   const [results, setResults] = useState<ResultRow[] | null>(null);
@@ -111,13 +114,34 @@ export default function ContentStudio() {
     setPlatforms((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
   }
 
+  async function handleGenerateImage() {
+    setGeneratingImage(true);
+    setGenerateImageError(null);
+    try {
+      const res = await fetch("/api/content/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product, offer: offer || undefined, tone: tone || undefined, details: details || undefined }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setGeneratedImageBase64(data.base64);
+        setFile(null);
+      } else {
+        setGenerateImageError(data.error ?? "Failed to generate image");
+      }
+    } finally {
+      setGeneratingImage(false);
+    }
+  }
+
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
     setGenerating(true);
     setResults(null);
     try {
-      const mediaType = file ? (file.type.startsWith("video/") ? "video" : "image") : undefined;
-      const mediaBase64 = mediaType === "image" && file ? await fileToBase64(file) : undefined;
+      const mediaType = file || generatedImageBase64 ? (file?.type.startsWith("video/") ? "video" : "image") : undefined;
+      const mediaBase64 = mediaType === "image" ? (file ? await fileToBase64(file) : generatedImageBase64 ?? undefined) : undefined;
       const res = await fetch("/api/content/repurpose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -165,8 +189,37 @@ export default function ContentStudio() {
           </div>
           <div className="mb-3">
             <label className="text-xs font-medium text-white/50 block mb-1">Photo or video (optional)</label>
-            <input type="file" accept="image/*,video/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="text-sm" />
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                type="file"
+                accept="image/*,video/*"
+                onChange={(e) => {
+                  setFile(e.target.files?.[0] ?? null);
+                  setGeneratedImageBase64(null);
+                }}
+                disabled={!!generatedImageBase64}
+                className="text-sm disabled:opacity-40"
+              />
+              <span className="text-xs text-white/30">or</span>
+              <button
+                type="button"
+                onClick={handleGenerateImage}
+                disabled={generatingImage || !!file || !product}
+                className="text-xs font-medium rounded-lg border border-fuchsia-500/40 text-fuchsia-400 px-3 py-1.5 hover:bg-fuchsia-950/30 disabled:opacity-40"
+              >
+                {generatingImage ? "Generating…" : "✨ Generate an image with AI"}
+              </button>
+            </div>
             {file && <div className="text-xs text-white/40 mt-1">{file.name} ({file.type.startsWith("video/") ? "video" : "image"})</div>}
+            {generateImageError && <div className="text-xs text-red-400 mt-1">{generateImageError}</div>}
+            {generatedImageBase64 && (
+              <div className="mt-2 flex items-center gap-2">
+                <img src={`data:image/png;base64,${generatedImageBase64}`} alt="" className="w-16 h-16 rounded-lg object-cover" />
+                <button type="button" onClick={() => setGeneratedImageBase64(null)} className="text-xs text-red-400 hover:underline">
+                  Remove
+                </button>
+              </div>
+            )}
           </div>
           <div className="mb-4">
             <label className="text-xs font-medium text-white/50 block mb-1.5">Platforms</label>
