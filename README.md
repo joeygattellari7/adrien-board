@@ -176,14 +176,20 @@ scratch) across every social platform and queueing it to go out:
    TikTok, Twitter/X), and it generates a tailored caption + hashtags per
    platform (Anthropic API, template fallback) plus a center-cropped image
    resized to each platform's native aspect ratio (via `sharp`).
-   - **Video is not resized or generated.** Transcoding video per platform
-     (aspect ratio, length limits) needs a real media pipeline — ffmpeg in a
-     serverless function is fragile (execution time limits, no persistent
-     disk) and wasn't something to ship untested. Video posts carry the
-     original file through as-is, with a note showing the target spec for
-     each platform. AI video generation (Runway/Luma/Veo/Kling) is a
-     separate paid API each, not yet wired up — a further fast-follow once
-     one's chosen.
+   - **Video is now resized** (crop/scale to each platform's aspect ratio,
+     trimmed to its max length) via `ffmpeg` (`fluent-ffmpeg` +
+     `@ffmpeg-installer/ffmpeg`), with the result uploaded to Vercel Blob and
+     scheduled by URL rather than inline bytes. This is genuinely best-effort
+     — ffmpeg in a serverless function has real constraints (execution time
+     limits, `/tmp` size, no persistent disk between invocations) that
+     couldn't be fully validated outside an actual Vercel deploy; the pipeline
+     itself was tested end-to-end locally (a real ffmpeg crop/scale/trim run)
+     but not against Vercel's specific limits. If it fails, the platform
+     falls back to a note with the target spec instead of a broken file.
+     Requires `BLOB_READ_WRITE_TOKEN` (see Setup below) — without it, video
+     falls back to the target-spec note as before.
+   - AI video generation (Runway/Luma/Veo/Kling) is still not wired up —
+     each is a separate paid API, a further fast-follow once one's chosen.
 2. **Scheduler** (`/api/content/schedule`, `/api/content/publish-due`) — a
    queue of everything scheduled from Content Studio. A Vercel Cron job
    (`vercel.json`, daily — see the Cron note below) hits `/api/content/publish-due`:
@@ -206,6 +212,11 @@ scratch) across every social platform and queueing it to go out:
   Marketplace) for persistence. Without it, the queue falls back to
   in-memory storage that doesn't survive a restart or cold start — fine for
   trying it out, not for production use.
+- Video (resizing, or storing one in Adrien Brain's content library) needs
+  `BLOB_READ_WRITE_TOKEN` (add a Blob store from the Vercel project's
+  Storage tab, which sets this automatically). Redis's REST API caps value
+  sizes well below what a video file needs, so Blob is used for video
+  specifically — images still go through Redis/in-memory as before.
 - **Vercel Cron note**: the Hobby plan only allows daily cron runs, so
   `vercel.json` schedules `/api/content/publish-due` once a day (9am UTC).
   A more frequent check (every 5–15 min, so scheduled posts go out closer to
@@ -235,12 +246,23 @@ two at the absolute most.**
   ("repurpose") or a "Generate an image" button when the library's empty or
   exhausted. One click — "Approve & schedule" — sends it straight into the
   same Scheduler queue everything else uses.
-- **Video** isn't stored in the library or generated here, for the same
-  reason as everywhere else in Content Studio — no media pipeline for it
-  yet. The library is images only for now.
+- **Video** can now be added to the library too (needs `BLOB_READ_WRITE_TOKEN`
+  — see above), stored and previewed by URL rather than inline like images.
+- **2-week idea calendar** (`/api/content/calendar`) — one flagship content
+  idea per day for the next 14 days (format: reel or static; tone: funny,
+  serious, warm, or informative), adapt it per platform when you actually
+  schedule it. Informed by real engagement/follower-trend numbers pulled
+  from the Social Media Review data where available (Meta ← Facebook +
+  Instagram, YouTube, TikTok — LinkedIn and Twitter/X aren't tracked there
+  yet, so those get no performance signal). There's no live trends feed
+  integrated (no TikTok Trends API, no Google Trends) — the AI reasons from
+  its own general knowledge of platform trends instead, and says so in its
+  reasoning rather than presenting it as live data. Template fallback
+  without `ANTHROPIC_API_KEY`.
 
 This reuses the Scheduler's Redis/in-memory backend and Content Studio's
-image generation — no new env vars beyond what those already need.
+image generation — no new env vars beyond what those already need, plus
+`BLOB_READ_WRITE_TOKEN` for video.
 
 ## Deploy on Vercel
 

@@ -9,6 +9,7 @@ type ResultRow = {
   caption: string;
   hashtags: string[];
   resizedImageBase64?: string;
+  resizedVideoUrl?: string;
   mediaNote?: string;
 };
 
@@ -33,8 +34,8 @@ function ScheduleRow({ result, originalFile }: { result: ResultRow; originalFile
     setSaving(true);
     setDone(null);
     try {
-      const mediaBase64 =
-        mediaType === "image" ? result.resizedImageBase64 : mediaType === "video" && originalFile ? await fileToBase64(originalFile) : undefined;
+      const mediaBase64 = mediaType === "image" ? result.resizedImageBase64 : undefined;
+      const mediaUrl = mediaType === "video" ? result.resizedVideoUrl : undefined;
       const res = await fetch("/api/content/schedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -43,7 +44,8 @@ function ScheduleRow({ result, originalFile }: { result: ResultRow; originalFile
           caption,
           hashtags: result.hashtags,
           mediaBase64,
-          mediaType,
+          mediaUrl,
+          mediaType: mediaBase64 || mediaUrl ? mediaType : undefined,
           scheduledFor: new Date(when).toISOString(),
         }),
       });
@@ -60,9 +62,11 @@ function ScheduleRow({ result, originalFile }: { result: ResultRow; originalFile
         <span className="text-sm font-semibold">{result.spec.label}</span>
         <span className="text-[10px] text-white/40">{result.spec.imageAspect.ratio} · {result.spec.captionMaxChars} char max</span>
       </div>
-      {result.resizedImageBase64 && (
+      {result.resizedVideoUrl ? (
+        <video src={result.resizedVideoUrl} controls className="w-full aspect-video bg-black" />
+      ) : result.resizedImageBase64 ? (
         <img src={`data:image/jpeg;base64,${result.resizedImageBase64}`} alt="" className="w-full aspect-video object-cover" />
-      )}
+      ) : null}
       {result.mediaNote && <div className="px-3 pt-2 text-[11px] text-amber-400">{result.mediaNote}</div>}
       <div className="p-3">
         <textarea
@@ -141,11 +145,20 @@ export default function ContentStudio() {
     setResults(null);
     try {
       const mediaType = file || generatedImageBase64 ? (file?.type.startsWith("video/") ? "video" : "image") : undefined;
-      const mediaBase64 = mediaType === "image" ? (file ? await fileToBase64(file) : generatedImageBase64 ?? undefined) : undefined;
+      const mediaBase64 = mediaType === "image" ? (file ? await fileToBase64(file) : generatedImageBase64 ?? undefined) : mediaType === "video" && file ? await fileToBase64(file) : undefined;
       const res = await fetch("/api/content/repurpose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product, offer: offer || undefined, tone: tone || undefined, details: details || undefined, platforms, mediaType, mediaBase64 }),
+        body: JSON.stringify({
+          product,
+          offer: offer || undefined,
+          tone: tone || undefined,
+          details: details || undefined,
+          platforms,
+          mediaType,
+          mediaBase64,
+          mediaMimeType: file?.type,
+        }),
       });
       const data = await res.json();
       if (res.ok) {

@@ -35,7 +35,9 @@ async function redisCommand(command: (string | number)[]): Promise<unknown> {
 
 export type LibraryAsset = {
   id: string;
-  base64: string; // JPEG/PNG, base64 — video isn't stored here, same reasoning as elsewhere in Content Studio
+  type: "image" | "video";
+  base64?: string; // images only — small enough to store inline in Redis
+  mediaUrl?: string; // videos only — stored in Vercel Blob, Redis can't hold files this size
   label: string;
   tags: string[];
   createdAt: string;

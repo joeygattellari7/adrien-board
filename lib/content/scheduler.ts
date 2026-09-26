@@ -7,7 +7,8 @@ export type ScheduledPost = {
   platform: ContentPlatform;
   caption: string;
   hashtags: string[];
-  mediaBase64?: string; // omitted for video — see repurpose.ts note
+  mediaBase64?: string; // images only — inline in Redis
+  mediaUrl?: string; // videos only — stored in Vercel Blob
   mediaType?: "image" | "video";
   scheduledFor: string; // ISO datetime
   status: PostStatus;

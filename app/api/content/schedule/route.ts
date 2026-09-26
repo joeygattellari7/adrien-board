@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
     caption: String(body.caption).slice(0, PLATFORM_SPECS[platform].captionMaxChars),
     hashtags: Array.isArray(body.hashtags) ? body.hashtags.map(String) : [],
     mediaBase64: typeof body.mediaBase64 === "string" ? body.mediaBase64 : undefined,
+    mediaUrl: typeof body.mediaUrl === "string" ? body.mediaUrl : undefined,
     mediaType: body.mediaType === "image" || body.mediaType === "video" ? body.mediaType : undefined,
     scheduledFor: scheduledFor.toISOString(),
     status: "scheduled",

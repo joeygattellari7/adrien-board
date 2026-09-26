@@ -18,7 +18,7 @@ export type ContentProposal = {
   urgency: "overdue" | "due_soon";
   hoursSinceLastPost: number | null;
   source: "repurpose" | "generate";
-  asset?: { id: string; base64: string; label: string };
+  asset?: { id: string; type: "image" | "video"; base64?: string; mediaUrl?: string; label: string };
   caption: string;
   hashtags: string[];
 };
@@ -73,7 +73,7 @@ export async function buildContentPlan(): Promise<ContentProposal[]> {
       urgency,
       hoursSinceLastPost: hoursSince,
       source: asset ? "repurpose" : "generate",
-      asset: asset ? { id: asset.id, base64: asset.base64, label: asset.label } : undefined,
+      asset: asset ? { id: asset.id, type: asset.type, base64: asset.base64, mediaUrl: asset.mediaUrl, label: asset.label } : undefined,
       caption: copyResult.caption,
       hashtags: copyResult.hashtags,
     };
